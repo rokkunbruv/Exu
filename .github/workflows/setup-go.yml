@@ -3,9 +3,9 @@ on: [push, pull_request]
 
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: windows
     steps:
       - uses: actions/setup-go@v3
         with:
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: ./go.sum
