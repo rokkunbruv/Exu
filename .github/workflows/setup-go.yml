@@ -1,0 +1,4 @@
+- uses: actions/setup-go@v3
+  with:
+    cache: true
+    cache-dependency-path: go.sum
