@@ -172,9 +172,7 @@ func Lexer(source string) ([]token.Token, error) {
 			lexeme := getLexeme(source, start, curr+n)
 			addToken(&tokens, tokenType, lexeme, literal, line)
 
-		case ' ':
-		case '\r':
-		case '\t':
+		case ' ', '\r', '\t':
 			continue
 
 		case '\n':
@@ -198,7 +196,7 @@ func Lexer(source string) ([]token.Token, error) {
 			}
 
 			if isAtEnd(source, curr) {
-				return nil, fmt.Errorf("unterminated string at line %v index %v", line, curr)
+				return nil, fmt.Errorf("unterminated string at line %v", line)
 			}
 
 			// Consume the closing "
@@ -250,13 +248,12 @@ func Lexer(source string) ([]token.Token, error) {
 
 			// Tokenizes identifiers/keywords
 			// For identifiers, it only accept names that does not start with a digit
-			case c == '_':
-			case isAlpha(c):
+			case isAlpha(c), c == '_':
 				// Consume the first character in the identifier/keyword
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 
-				for isAlphaNum(c) {
+				for isAlphaNum(c) || c == '_' {
 					curr += n
 					c, n = utf8.DecodeRuneInString(source[curr:])
 				}
@@ -273,7 +270,7 @@ func Lexer(source string) ([]token.Token, error) {
 				continue
 
 			default:
-				return nil, fmt.Errorf("unexpected %v found at line %v", c, line)
+				return nil, fmt.Errorf("unexpected %v found at line %v", string(c), line)
 			}
 		}
 
@@ -281,6 +278,7 @@ func Lexer(source string) ([]token.Token, error) {
 		curr += n
 	}
 
+	addToken(&tokens, token.EOF, "", token.Literal{IsNull: true}, line)
 	return tokens, nil
 }
 
@@ -313,27 +311,6 @@ func peek(source string, curr int) rune {
 
 	// Get the next rune
 	r, _ := utf8.DecodeRuneInString(source[curr+n:])
-
-	return r
-}
-
-func peekNext(source string, curr int) rune {
-	if curr >= len(source) {
-		return 0
-	}
-
-	// Goes to the next character n
-	_, n := utf8.DecodeRuneInString(source[curr:])
-	nextIndex := curr + n
-	// Goes to the character next to n
-	_, n = utf8.DecodeRuneInString(source[nextIndex:])
-	newCurrent := nextIndex + n
-
-	if newCurrent >= len(source) {
-		return 0
-	}
-
-	r, _ := utf8.DecodeRuneInString(source[newCurrent:])
 
 	return r
 }
