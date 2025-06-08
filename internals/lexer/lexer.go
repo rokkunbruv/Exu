@@ -173,7 +173,6 @@ func Lexer(source string) ([]token.Token, error) {
 			addToken(&tokens, tokenType, lexeme, literal, line)
 
 		case ' ', '\r', '\t':
-			continue
 
 		case '\n':
 			line++
