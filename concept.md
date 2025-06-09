@@ -10,8 +10,11 @@ The **Exu** programming language is based on the Lox programming language develo
 
 Exu supports the following primitive data types:
 
-- **Numbers** (32-bit floating point numbers)
+- **Numbers** (64-bit floating point numbers)
 - **Strings**
+
+  - Exu accepts multiline strings, which means that strings in Exu doesn't have to be defined on a single line
+
 - **Booleans**
 - **Null** (denoted as `null`)
 
@@ -202,47 +205,47 @@ Exu treats functions as first class, and thus supports higher order functions. T
 
 - Functions can be defined within functions (nested functions)
 
-    ```exu
-    fn parent() {
-        fn child() {
-            # some code
-        }
+  ```exu
+  fn parent() {
+      fn child() {
+          # some code
+      }
 
-        child();
-    }
-    ```
+      child();
+  }
+  ```
 
 - Functions are treated as values. This means that functions can be passed to
-other functions as arguments or can be returned by parent functions.
+  other functions as arguments or can be returned by parent functions.
 
-    ```exu
-    fn func1(var1, var2) {
-        return var1 + var2;
-    }
+      ```exu
+      fn func1(var1, var2) {
+          return var1 + var2;
+      }
 
-    fn func2(var) {
-        return var;
-    }
+      fn func2(var) {
+          return var;
+      }
 
-    func2(func1)(1, 2);
-    ```
+      func2(func1)(1, 2);
+      ```
 
-    ```exu
-    fn parent() {
-        fn child() {
-            # some code
-        }
+      ```exu
+      fn parent() {
+          fn child() {
+              # some code
+          }
 
-        return child;
-    }
-    ```
+          return child;
+      }
+      ```
 
-    As a consequence of the code above, any variable can act as a function that
-    executes code.
+      As a consequence of the code above, any variable can act as a function that
+      executes code.
 
-    ```exu
-    var: parent(); # executes child()
-    ```
+      ```exu
+      var: parent(); # executes child()
+      ```
 
 ### Classes
 
@@ -273,7 +276,7 @@ class MyClass {
 
 # var is an instance of MyClass
 # instantiated by MyClass's factory method [MyClass()]
-var: MyClass() 
+var: MyClass()
 ```
 
 Classes can either contain attributes or methods.
