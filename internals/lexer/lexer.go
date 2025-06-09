@@ -8,6 +8,7 @@ import (
 	"github.com/rokkunbruv/internals/token"
 )
 
+// Converts source code into a slice of tokens
 func Lexer(source string) ([]token.Token, error) {
 	var tokens []token.Token
 
@@ -36,8 +37,21 @@ func Lexer(source string) ([]token.Token, error) {
 			break
 		}
 
+		// Immediately throws an error before checking the character
+		// if the curr pointer is on an invalid index
+
+		// The invalid index means that the curr pointer is in the middle
+		// of a Unicode character byte sequence
+
+		// This also prevents this error handling in between the mess
+		// that is the switch statement below
+
+		// Note that this same code is also present on some cases of the
+		// switch statement since in those cases, it does not go back
+		// to the start of the loop on the next iteration, which
+		// are typically cases for comments of multicharacter tokens
 		if peek(source, curr) == utf8.RuneError {
-			return nil, fmt.Errorf("UTF-8 decoding error at line %v index %v", line, curr)
+			return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 		}
 
 		// Sets the start of the token string to the curr pointer location
@@ -46,6 +60,8 @@ func Lexer(source string) ([]token.Token, error) {
 		// Get current character
 		c, n := utf8.DecodeRuneInString(source[curr:])
 
+		// Setting the end bounds on getLexeme at curr+n
+		// ensures that the last character of the lexeme is scanned
 		switch c {
 		case '(':
 			literal := token.Literal{IsNull: true}
@@ -103,7 +119,7 @@ func Lexer(source string) ([]token.Token, error) {
 			// Skip rest of the line if it is a comment (preceded by #)
 			for peek(source, curr) != '\n' && !isAtEnd(source, curr) {
 				if peek(source, curr) == utf8.RuneError {
-					return nil, fmt.Errorf("UTF-8 decoding error at line %v index %v", line, curr)
+					return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 				}
 
 				curr += n
@@ -127,7 +143,7 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v index %v", line, curr)
+				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 			} else {
 				tokenType = token.NOT
 			}
@@ -149,7 +165,7 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v index %v", line, curr)
+				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 			} else {
 				tokenType = token.LESS
 			}
@@ -165,19 +181,25 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v index %v", line, curr)
+				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 			} else {
 				tokenType = token.GREATER
 			}
 			lexeme := getLexeme(source, start, curr+n)
 			addToken(&tokens, tokenType, lexeme, literal, line)
 
+		// This does nothing, equivalent to adding a break statement to this
+		// case except this break is automatically added in Go
 		case ' ', '\r', '\t':
 
 		case '\n':
 			line++
 
+		// Scans for a potential string
 		case '"':
+			// Keeps track of the size of the previous character
+			// Necessary when we want to access the previous character
+			// Updated as curr moves to the next character
 			prevN := n
 
 			// Consume the opening "
@@ -187,6 +209,9 @@ func Lexer(source string) ([]token.Token, error) {
 			for c != '"' && !isAtEnd(source, curr) {
 				if c == '\n' {
 					line++
+				}
+				if peek(source, curr) == utf8.RuneError {
+					return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
 				}
 
 				prevN = n
@@ -203,21 +228,33 @@ func Lexer(source string) ([]token.Token, error) {
 			curr += n
 			c, n = utf8.DecodeRuneInString(source[curr:])
 
-			// Get width next to start
+			// Get size of the character next to start
 			_, nxtS := utf8.DecodeRuneInString(source[start:])
 
 			lexeme := getLexeme(source, start, curr)
+			// Trims the quotation mark characters
+			// start+nxtS is equivalent to start+1 for an ASCII source string
+			// curr-prevN is equivalent to curr-1 for an ASCII source string
 			var value string = source[start+nxtS : curr-prevN]
-			literal := token.Literal{Type: token.STRING_LITERAL, StrVal: value}
+			literal := token.Literal{Type: token.STRING_LITERAL}
+			literal.SetVal(value)
 			addToken(&tokens, token.STRING, lexeme, literal, line)
 
+			// Since we are on the character after the second quotation mark
+			// We skip the curr to next character logic below
+			// To start the iteration on this character
 			continue
 
 		default:
 			switch {
+			// Scans for potential numerics
 			case isDigit(c):
 				// Consume the decimal part of the numeric
 				for isDigit(c) {
+					if peek(source, curr) == utf8.RuneError {
+						return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+					}
+
 					curr += n
 					c, n = utf8.DecodeRuneInString(source[curr:])
 				}
@@ -236,13 +273,19 @@ func Lexer(source string) ([]token.Token, error) {
 				}
 
 				lexeme := getLexeme(source, start, curr)
+				// Convert the string representation of the numeric value
+				// To an actual numeric value represented by a
+				// 64-bit floating point
 				value, err := strconv.ParseFloat(source[start:curr], 64)
 				if err != nil {
 					return nil, err
 				}
-				literal := token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: value}
+				literal := token.Literal{Type: token.NUMERIC_LITERAL}
+				literal.SetVal(value)
 				addToken(&tokens, token.NUMERIC, lexeme, literal, line)
 
+				// We skip the curr to next character logic
+				// To prevent skipping the character next to the numeric
 				continue
 
 			// Tokenizes identifiers/keywords
@@ -253,12 +296,19 @@ func Lexer(source string) ([]token.Token, error) {
 				c, n = utf8.DecodeRuneInString(source[curr:])
 
 				for isAlphaNum(c) || c == '_' {
+					if peek(source, curr) == utf8.RuneError {
+						return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+					}
+
 					curr += n
 					c, n = utf8.DecodeRuneInString(source[curr:])
 				}
 
 				lexeme := getLexeme(source, start, curr)
 
+				// Check if the lexeme is in the list of keywords
+				// If it exists, assign type to that keyword type
+				// If not, set it as an identifier
 				tokenType, ok := keywords[lexeme]
 				if !ok {
 					tokenType = token.IDENTIFIER
@@ -266,8 +316,11 @@ func Lexer(source string) ([]token.Token, error) {
 				literal := token.Literal{Type: token.STRING_LITERAL, IsNull: true}
 				addToken(&tokens, tokenType, lexeme, literal, line)
 
+				// We skip the curr to next character logic
+				// To prevent skipping the character next to the identifier/keyword
 				continue
 
+			// Error handling for unexpected characters
 			default:
 				return nil, fmt.Errorf("unexpected %v found at line %v", string(c), line)
 			}
@@ -281,12 +334,16 @@ func Lexer(source string) ([]token.Token, error) {
 	return tokens, nil
 }
 
+// HELPER FUNCTIONS
+
+// Appends a token to the tokens slice
 func addToken(tokens *[]token.Token, tokenType token.TokenType, lexeme string, literal token.Literal, line int) {
 	*tokens = append(*tokens, token.Token{TokenType: tokenType, Lexeme: lexeme, Literal: literal, Line: line})
 }
 
-func getLexeme(source string, start int, curr int) string {
-	return source[start:curr]
+// Extracts the token lexeme from the source string
+func getLexeme(source string, start int, end int) string {
+	return source[start:end]
 }
 
 // Checks if the curr character pointer reaches the end of the source line

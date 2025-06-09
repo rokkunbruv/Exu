@@ -31,7 +31,7 @@ const (
 	// Literals
 	STRING     TokenType = "STRING"
 	NUMERIC    TokenType = "NUMERIC"
-	IDENTIFIER TokenType = "IDENTIFIER"
+	IDENTIFIER TokenType = "IDENTIFIER" // Variable names
 
 	// Keywords
 	TRUE   TokenType = "TRUE"
