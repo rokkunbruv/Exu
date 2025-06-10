@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/attic-labs/testify/assert"
+	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
 
@@ -24,55 +25,77 @@ func TestLexer(t *testing.T) {
 	tests := []testCase{
 		{
 			name:   "test all keywords, operators, and separators in one line",
-			source: "fn test() { if true && false || null while for else class super self return print }",
+			source: "fn test() { if true && false | null while for else class super self return print }",
 			expected: []token.Token{
-				{TokenType: token.FN, Lexeme: "fn", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.IF, Lexeme: "if", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.TRUE, Lexeme: "true", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.AND, Lexeme: "&", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.AND, Lexeme: "&", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.FALSE, Lexeme: "false", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.OR, Lexeme: "|", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.OR, Lexeme: "|", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NULL, Lexeme: "null", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.WHILE, Lexeme: "while", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.FOR, Lexeme: "for", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.ELSE, Lexeme: "else", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.CLASS, Lexeme: "class", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.SUPER, Lexeme: "super", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.SUPER, Lexeme: "self", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.RETURN, Lexeme: "return", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.PRINT, Lexeme: "print", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 0},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 0},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 0},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 0},
+				{TokenType: token.IF, Lexeme: "if", Literal: nil, Line: 0},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: func() *literal.BoolLiteral {
+					lit := &literal.BoolLiteral{}
+					lit.SetVal(true)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 0},
+				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 0},
+				{TokenType: token.FALSE, Lexeme: "false", Literal: func() *literal.BoolLiteral {
+					lit := &literal.BoolLiteral{}
+					lit.SetVal(false)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.OR, Lexeme: "|", Literal: nil, Line: 0},
+				{TokenType: token.NULL, Lexeme: "null", Literal: nil, Line: 0},
+				{TokenType: token.WHILE, Lexeme: "while", Literal: nil, Line: 0},
+				{TokenType: token.FOR, Lexeme: "for", Literal: nil, Line: 0},
+				{TokenType: token.ELSE, Lexeme: "else", Literal: nil, Line: 0},
+				{TokenType: token.CLASS, Lexeme: "class", Literal: nil, Line: 0},
+				{TokenType: token.SUPER, Lexeme: "super", Literal: nil, Line: 0},
+				{TokenType: token.SELF, Lexeme: "self", Literal: nil, Line: 0},
+				{TokenType: token.RETURN, Lexeme: "return", Literal: nil, Line: 0},
+				{TokenType: token.PRINT, Lexeme: "print", Literal: nil, Line: 0},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 0},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
 			},
 		},
 		{
 			name:   "test all operators and number formats",
-			source: "1 + -2.34 * 0.5 / != <= >= < > == : <- 000123.456",
+			source: "1 + -2.34 * 0.5 / != <= >= < > = : <- 000123.456",
 			expected: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 1}, Line: 0},
-				{TokenType: token.PLUS, Lexeme: "+", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.MINUS, Lexeme: "-", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "2.34", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 2.34}, Line: 0},
-				{TokenType: token.STAR, Lexeme: "*", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "0.5", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 0.5}, Line: 0},
-				{TokenType: token.SLASH, Lexeme: "/", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LESS, Lexeme: "<", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.GREATER, Lexeme: ">", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LEFT_ARROW, Lexeme: "<-", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "000123.456", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123.456}, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(1)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 0},
+				{TokenType: token.MINUS, Lexeme: "-", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "2.34", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(2.34)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "0.5", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(0.5)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.SLASH, Lexeme: "/", Literal: nil, Line: 0},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
+				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 0},
+				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 0},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.LEFT_ARROW, Lexeme: "<-", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "000123.456", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123.456)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -85,13 +108,13 @@ func TestLexer(t *testing.T) {
 			name:   "test whitespace handling and comment",
 			source: "fn\ttest\n(\n)\t{\n#comment\n}",
 			expected: []token.Token{
-				{TokenType: token.FN, Lexeme: "fn", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: token.Literal{IsNull: true}, Line: 1},
-				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: token.Literal{IsNull: true}, Line: 2},
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: token.Literal{IsNull: true}, Line: 2},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: token.Literal{IsNull: true}, Line: 4},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 4},
+				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 0},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 2},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 2},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 4},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
 			},
 		},
 		{
@@ -104,18 +127,26 @@ func TestLexer(t *testing.T) {
 			name:   "test adjacent tokens and special identifiers",
 			source: "x:1,_y:.2,z:",
 			expected: []token.Token{
-				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 1}, Line: 0},
-				{TokenType: token.COMMA, Lexeme: ",", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "_y", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.DOT, Lexeme: ".", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "2", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 2}, Line: 0},
-				{TokenType: token.COMMA, Lexeme: ",", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "z", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: nil, Line: 0},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(1)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "_y", Literal: nil, Line: 0},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.DOT, Lexeme: ".", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "2", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(2)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "z", Literal: nil, Line: 0},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -128,44 +159,64 @@ func TestLexer(t *testing.T) {
 			name:   "test adjacent comparison operators",
 			source: "!=!<==>=><==<>=!==",
 			expected: []token.Token{
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NOT, Lexeme: "!", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.GREATER, Lexeme: ">", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.LESS, Lexeme: "<", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
+				{TokenType: token.NOT, Lexeme: "!", Literal: nil, Line: 0},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
+				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 0},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
+				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 0},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
 			},
 		},
 		{
 			name:   "test invalid identifiers and comments across multiple lines",
-			source: "1var_test: 42\n_valid_var: 10\n#comment line 1\n#comment line 2\n123_invalid: 30",
+			source: "1var_test: 42\n_valid_var: \"str\"\n#comment line 1\n#comment line 2\n123_invalid: 30",
 			expected: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 1}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "var_test", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 0},
-				{TokenType: token.NUMERIC, Lexeme: "42", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 42}, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "_valid_var", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "10", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 10}, Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "123", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123}, Line: 4},
-				{TokenType: token.IDENTIFIER, Lexeme: "_invalid", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 4},
-				{TokenType: token.COLON, Lexeme: ":", Literal: token.Literal{IsNull: true}, Line: 4},
-				{TokenType: token.NUMERIC, Lexeme: "30", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 30}, Line: 4},
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 4},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(1)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "var_test", Literal: nil, Line: 0},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "42", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(42)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "_valid_var", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
+				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: func() *literal.StringLiteral {
+					lit := &literal.StringLiteral{}
+					lit.SetVal("str")
+					return lit
+				}(), Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "123", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123)
+					return lit
+				}(), Line: 4},
+				{TokenType: token.IDENTIFIER, Lexeme: "_invalid", Literal: nil, Line: 4},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 4},
+				{TokenType: token.NUMERIC, Lexeme: "30", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(30)
+					return lit
+				}(), Line: 4},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
 			},
 		},
 		{
 			name:   "test comments with various content and empty lines",
 			source: "#comment with numbers 123\n\n#comment with symbols @#$\n#comment with keywords if while\n",
 			expected: []token.Token{
-				{TokenType: token.EOF, Lexeme: "", Literal: token.Literal{IsNull: true}, Line: 4},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
 			},
 		},
 		{
@@ -277,7 +328,7 @@ func TestAddToken(t *testing.T) {
 		tokens    []token.Token
 		tokenType token.TokenType
 		lexeme    string
-		literal   token.Literal
+		literal   literal.Literal
 		line      int
 
 		expected []token.Token
@@ -289,24 +340,40 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.NUMERIC,
 			lexeme:    "123",
-			literal:   token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123},
-			line:      0,
+			literal: func() *literal.NumericLiteral {
+				lit := &literal.NumericLiteral{}
+				lit.SetVal(123)
+				return lit
+			}(),
+			line: 0,
 			expected: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "123", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123}, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "123", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123)
+					return lit
+				}(), Line: 0},
 			},
 		},
 		{
 			name: "test add operator after numeric",
 			tokens: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "123", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123}, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "123", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123)
+					return lit
+				}(), Line: 0},
 			},
 			tokenType: token.PLUS,
 			lexeme:    "+",
-			literal:   token.Literal{IsNull: true},
+			literal:   nil,
 			line:      0,
 			expected: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "123", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 123}, Line: 0},
-				{TokenType: token.PLUS, Lexeme: "+", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.NUMERIC, Lexeme: "123", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123)
+					return lit
+				}(), Line: 0},
+				{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -314,10 +381,18 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.STRING,
 			lexeme:    "\"hello\"",
-			literal:   token.Literal{Type: token.STRING_LITERAL, StrVal: "hello"},
-			line:      0,
+			literal: func() *literal.StringLiteral {
+				lit := &literal.StringLiteral{}
+				lit.SetVal("hello")
+				return lit
+			}(),
+			line: 0,
 			expected: []token.Token{
-				{TokenType: token.STRING, Lexeme: "\"hello\"", Literal: token.Literal{Type: token.STRING_LITERAL, StrVal: "hello"}, Line: 0},
+				{TokenType: token.STRING, Lexeme: "\"hello\"", Literal: func() *literal.StringLiteral {
+					lit := &literal.StringLiteral{}
+					lit.SetVal("hello")
+					return lit
+				}(), Line: 0},
 			},
 		},
 		{
@@ -325,10 +400,10 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.IF,
 			lexeme:    "if",
-			literal:   token.Literal{Type: token.STRING_LITERAL, IsNull: true},
+			literal:   nil,
 			line:      0,
 			expected: []token.Token{
-				{TokenType: token.IF, Lexeme: "if", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
+				{TokenType: token.IF, Lexeme: "if", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -336,10 +411,18 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.NUMERIC,
 			lexeme:    "456",
-			literal:   token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 456},
-			line:      2,
+			literal: func() *literal.NumericLiteral {
+				lit := &literal.NumericLiteral{}
+				lit.SetVal(456)
+				return lit
+			}(),
+			line: 2,
 			expected: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "456", Literal: token.Literal{Type: token.NUMERIC_LITERAL, DoubleVal: 456}, Line: 2},
+				{TokenType: token.NUMERIC, Lexeme: "456", Literal: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(456)
+					return lit
+				}(), Line: 2},
 			},
 		},
 		{
@@ -347,10 +430,18 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.TRUE,
 			lexeme:    "true",
-			literal:   token.Literal{Type: token.STRING_LITERAL, IsNull: true},
-			line:      0,
+			literal: func() *literal.BoolLiteral {
+				lit := &literal.BoolLiteral{}
+				lit.SetVal(true)
+				return lit
+			}(),
+			line: 0,
 			expected: []token.Token{
-				{TokenType: token.TRUE, Lexeme: "true", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: func() *literal.BoolLiteral {
+					lit := &literal.BoolLiteral{}
+					lit.SetVal(true)
+					return lit
+				}(), Line: 0},
 			},
 		},
 		{
@@ -358,10 +449,10 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.IDENTIFIER,
 			lexeme:    "x",
-			literal:   token.Literal{Type: token.STRING_LITERAL, IsNull: true},
+			literal:   nil,
 			line:      0,
 			expected: []token.Token{
-				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -369,10 +460,18 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.STRING,
 			lexeme:    "\"\"",
-			literal:   token.Literal{Type: token.STRING_LITERAL, StrVal: ""},
-			line:      0,
+			literal: func() *literal.StringLiteral {
+				lit := &literal.StringLiteral{}
+				lit.SetVal("")
+				return lit
+			}(),
+			line: 0,
 			expected: []token.Token{
-				{TokenType: token.STRING, Lexeme: "\"\"", Literal: token.Literal{Type: token.STRING_LITERAL, StrVal: ""}, Line: 0},
+				{TokenType: token.STRING, Lexeme: "\"\"", Literal: func() *literal.StringLiteral {
+					lit := &literal.StringLiteral{}
+					lit.SetVal("")
+					return lit
+				}(), Line: 0},
 			},
 		},
 		{
@@ -380,10 +479,10 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.FN,
 			lexeme:    "fn",
-			literal:   token.Literal{Type: token.STRING_LITERAL, IsNull: true},
+			literal:   nil,
 			line:      0,
 			expected: []token.Token{
-				{TokenType: token.FN, Lexeme: "fn", Literal: token.Literal{Type: token.STRING_LITERAL, IsNull: true}, Line: 0},
+				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 0},
 			},
 		},
 		{
@@ -391,10 +490,10 @@ func TestAddToken(t *testing.T) {
 			tokens:    []token.Token{},
 			tokenType: token.LESS_EQUAL,
 			lexeme:    "<=",
-			literal:   token.Literal{IsNull: true},
+			literal:   nil,
 			line:      0,
 			expected: []token.Token{
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: token.Literal{IsNull: true}, Line: 0},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
 			},
 		},
 	}

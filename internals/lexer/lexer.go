@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
 
@@ -25,7 +26,7 @@ func Lexer(source string) ([]token.Token, error) {
 		"print":  token.PRINT,
 		"class":  token.CLASS,
 		"super":  token.SUPER,
-		"self":   token.SUPER,
+		"self":   token.SELF,
 	}
 
 	// Pointers for iterating over the source code
@@ -64,57 +65,44 @@ func Lexer(source string) ([]token.Token, error) {
 		// ensures that the last character of the lexeme is scanned
 		switch c {
 		case '(':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.LEFT_PAREN, lexeme, literal, line)
+			addToken(&tokens, token.LEFT_PAREN, lexeme, nil, line)
 		case ')':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.RIGHT_PAREN, lexeme, literal, line)
+			addToken(&tokens, token.RIGHT_PAREN, lexeme, nil, line)
 		case '{':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.LEFT_BRACE, lexeme, literal, line)
+			addToken(&tokens, token.LEFT_BRACE, lexeme, nil, line)
 		case '}':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.RIGHT_BRACE, lexeme, literal, line)
+			addToken(&tokens, token.RIGHT_BRACE, lexeme, nil, line)
 		case ',':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.COMMA, lexeme, literal, line)
+			addToken(&tokens, token.COMMA, lexeme, nil, line)
 		case '.':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.DOT, lexeme, literal, line)
+			addToken(&tokens, token.DOT, lexeme, nil, line)
 		case '-':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.MINUS, lexeme, literal, line)
+			addToken(&tokens, token.MINUS, lexeme, nil, line)
 		case '+':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.PLUS, lexeme, literal, line)
+			addToken(&tokens, token.PLUS, lexeme, nil, line)
 		case ';':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.SEMICOLON, lexeme, literal, line)
+			addToken(&tokens, token.SEMICOLON, lexeme, nil, line)
 		case '*':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.STAR, lexeme, literal, line)
+			addToken(&tokens, token.STAR, lexeme, nil, line)
 		case '/':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.SLASH, lexeme, literal, line)
+			addToken(&tokens, token.SLASH, lexeme, nil, line)
 		case '=':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.EQUAL, lexeme, literal, line)
+			addToken(&tokens, token.EQUAL, lexeme, nil, line)
 		case ':':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.COLON, lexeme, literal, line)
+			addToken(&tokens, token.COLON, lexeme, nil, line)
 		case '#':
 			// Skip rest of the line if it is a comment (preceded by #)
 			for peek(source, curr) != '\n' && !isAtEnd(source, curr) {
@@ -126,15 +114,12 @@ func Lexer(source string) ([]token.Token, error) {
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			}
 		case '&':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.AND, lexeme, literal, line)
+			addToken(&tokens, token.AND, lexeme, nil, line)
 		case '|':
-			literal := token.Literal{IsNull: true}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, token.OR, lexeme, literal, line)
+			addToken(&tokens, token.OR, lexeme, nil, line)
 		case '!':
-			literal := token.Literal{IsNull: true}
 			var tokenType token.TokenType
 			if peek(source, curr) == '=' {
 				tokenType = token.NOT_EQUAL
@@ -148,9 +133,8 @@ func Lexer(source string) ([]token.Token, error) {
 				tokenType = token.NOT
 			}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, tokenType, lexeme, literal, line)
+			addToken(&tokens, tokenType, lexeme, nil, line)
 		case '<':
-			literal := token.Literal{IsNull: true}
 			var tokenType token.TokenType
 			if peek(source, curr) == '=' {
 				tokenType = token.LESS_EQUAL
@@ -170,9 +154,8 @@ func Lexer(source string) ([]token.Token, error) {
 				tokenType = token.LESS
 			}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, tokenType, lexeme, literal, line)
+			addToken(&tokens, tokenType, lexeme, nil, line)
 		case '>':
-			literal := token.Literal{IsNull: true}
 			var tokenType token.TokenType
 			if peek(source, curr) == '=' {
 				tokenType = token.GREATER_EQUAL
@@ -186,7 +169,7 @@ func Lexer(source string) ([]token.Token, error) {
 				tokenType = token.GREATER
 			}
 			lexeme := getLexeme(source, start, curr+n)
-			addToken(&tokens, tokenType, lexeme, literal, line)
+			addToken(&tokens, tokenType, lexeme, nil, line)
 
 		// This does nothing, equivalent to adding a break statement to this
 		// case except this break is automatically added in Go
@@ -236,9 +219,9 @@ func Lexer(source string) ([]token.Token, error) {
 			// start+nxtS is equivalent to start+1 for an ASCII source string
 			// curr-prevN is equivalent to curr-1 for an ASCII source string
 			var value string = source[start+nxtS : curr-prevN]
-			literal := token.Literal{Type: token.STRING_LITERAL}
+			literal := literal.StringLiteral{}
 			literal.SetVal(value)
-			addToken(&tokens, token.STRING, lexeme, literal, line)
+			addToken(&tokens, token.STRING, lexeme, &literal, line)
 
 			// Since we are on the character after the second quotation mark
 			// We skip the curr to next character logic below
@@ -280,9 +263,9 @@ func Lexer(source string) ([]token.Token, error) {
 				if err != nil {
 					return nil, err
 				}
-				literal := token.Literal{Type: token.NUMERIC_LITERAL}
+				literal := literal.NumericLiteral{}
 				literal.SetVal(value)
-				addToken(&tokens, token.NUMERIC, lexeme, literal, line)
+				addToken(&tokens, token.NUMERIC, lexeme, &literal, line)
 
 				// We skip the curr to next character logic
 				// To prevent skipping the character next to the numeric
@@ -313,8 +296,20 @@ func Lexer(source string) ([]token.Token, error) {
 				if !ok {
 					tokenType = token.IDENTIFIER
 				}
-				literal := token.Literal{Type: token.STRING_LITERAL, IsNull: true}
-				addToken(&tokens, tokenType, lexeme, literal, line)
+
+				// Set boolean literals to true/false keywords
+				switch tokenType {
+				case token.TRUE:
+					lit := &literal.BoolLiteral{}
+					lit.SetVal(true)
+					addToken(&tokens, tokenType, lexeme, lit, line)
+				case token.FALSE:
+					lit := &literal.BoolLiteral{}
+					lit.SetVal(false)
+					addToken(&tokens, tokenType, lexeme, lit, line)
+				default:
+					addToken(&tokens, tokenType, lexeme, nil, line)
+				}
 
 				// We skip the curr to next character logic
 				// To prevent skipping the character next to the identifier/keyword
@@ -330,14 +325,14 @@ func Lexer(source string) ([]token.Token, error) {
 		curr += n
 	}
 
-	addToken(&tokens, token.EOF, "", token.Literal{IsNull: true}, line)
+	addToken(&tokens, token.EOF, "", nil, line)
 	return tokens, nil
 }
 
 // HELPER FUNCTIONS
 
 // Appends a token to the tokens slice
-func addToken(tokens *[]token.Token, tokenType token.TokenType, lexeme string, literal token.Literal, line int) {
+func addToken(tokens *[]token.Token, tokenType token.TokenType, lexeme string, literal literal.Literal, line int) {
 	*tokens = append(*tokens, token.Token{TokenType: tokenType, Lexeme: lexeme, Literal: literal, Line: line})
 }
 

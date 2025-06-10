@@ -5,6 +5,7 @@
 package expr
 
 import (
+	literal "github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
 
@@ -38,7 +39,7 @@ func (g *Grouping) Accept(visitor Visitor) (any, error) {
 }
 
 type Literal struct {
-	Value token.Literal
+	Value literal.Literal
 }
 
 func (l *Literal) Accept(visitor Visitor) (any, error) {
