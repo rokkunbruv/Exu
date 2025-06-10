@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rokkunbruv/internals/expr"
+	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
 
@@ -14,34 +15,42 @@ type AstString struct{}
 // trees and subtrees are enclosed in parentheses
 // wherein the first item represents the parent
 // of that tree/subtree
-func main() {
+func Main() {
 	expression := &expr.Binary{
 		Left: &expr.Unary{
 			Operator: token.Token{
-				TokenType: token.MINUS, Lexeme: "-", Literal: token.Literal{IsNull: true}, Line: 1,
+				TokenType: token.MINUS, Lexeme: "-", Literal: nil, Line: 1,
 			},
 			Right: &expr.Literal{
-				Value: token.Literal{
-					Type: token.NUMERIC_LITERAL, DoubleVal: 123,
-				},
+				Value: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(123)
+					return lit
+				}(),
 			},
 		},
 		Operator: token.Token{
-			TokenType: token.STAR, Lexeme: "*", Literal: token.Literal{IsNull: true}, Line: 1,
+			TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 1,
 		},
 		Right: &expr.Grouping{
 			Expression: &expr.Literal{
-				Value: token.Literal{
-					Type: token.NUMERIC_LITERAL, DoubleVal: 45.67,
-				},
+				Value: func() *literal.NumericLiteral {
+					lit := &literal.NumericLiteral{}
+					lit.SetVal(45.67)
+					return lit
+				}(),
 			},
 		},
 	}
 
-	fmt.Println(toString(expression))
+	str, err := ToString(expression)
+	if err != nil {
+		fmt.Print(err)
+	}
+	fmt.Println(str)
 }
 
-func toString(expr expr.Expr) (string, error) {
+func ToString(expr expr.Expr) (string, error) {
 	visitor := &AstString{}
 
 	strObj, err := expr.Accept(visitor)
@@ -65,7 +74,7 @@ func (a *AstString) VisitGroupingExpr(expr *expr.Grouping) (any, error) {
 }
 
 func (a *AstString) VisitLiteralExpr(expr *expr.Literal) (any, error) {
-	return expr.Value.ToString()
+	return expr.Value.ToString(), nil
 }
 
 func (a *AstString) VisitUnaryExpr(expr *expr.Unary) (any, error) {
