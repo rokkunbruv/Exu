@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"fmt"
 	"testing"
 
+	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +28,7 @@ func TestMatch(t *testing.T) {
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			types:    []token.TokenType{token.PLUS, token.MINUS},
 			expected: false,
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:     "test curr at start and all types match",
@@ -84,7 +84,7 @@ func TestMatch(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.match(test.types...)
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -113,7 +113,7 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:       &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:      "test curr at start and type matches",
@@ -137,7 +137,7 @@ func TestConsume(t *testing.T) {
 			tokenType: token.EOF,
 			errorMsg:  "expected EOF token",
 			expected:  token.Token{},
-			err:       fmt.Errorf("expected EOF token"),
+			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: "expected EOF token"},
 		},
 		{
 			name:      "test curr in middle and type not matches",
@@ -145,7 +145,7 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       fmt.Errorf("expected plus token"),
+			err:       &exu_err.ParseError{Curr: 5, Message: "expected plus token"},
 		},
 		{
 			name:      "test curr at end and type not matches",
@@ -153,7 +153,7 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       fmt.Errorf("expected plus token"),
+			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: "expected plus token"},
 		},
 		{
 			name:      "test empty error message",
@@ -161,14 +161,14 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "",
 			expected:  token.Token{},
-			err:       fmt.Errorf(""),
+			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: ""},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.consume(test.tokenType, test.errorMsg)
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -195,7 +195,7 @@ func TestCheck(t *testing.T) {
 			parser:    Parser{tokens: []token.Token{}, curr: 0},
 			tokenType: token.PLUS,
 			expected:  false,
-			err:       fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:       &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:      "test curr at start and type matches",
@@ -237,7 +237,7 @@ func TestCheck(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.check(test.tokenType)
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -261,7 +261,7 @@ func TestAdvance(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:     "test curr at start",
@@ -285,20 +285,20 @@ func TestAdvance(t *testing.T) {
 			name:     "test curr at negative index",
 			parser:   Parser{tokens: tokens, curr: -1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: -1, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr beyond tokens length",
 			parser:   Parser{tokens: tokens, curr: len(tokens) + 1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: len(tokens) + 1, Message: "Index out of bounds"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.advance()
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -322,7 +322,7 @@ func TestIsAtEnd(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: false,
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:     "test curr at start",
@@ -343,20 +343,20 @@ func TestIsAtEnd(t *testing.T) {
 			name:     "test curr at negative index",
 			parser:   Parser{tokens: tokens, curr: -1},
 			expected: false,
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: -1, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr beyond tokens length",
 			parser:   Parser{tokens: tokens, curr: len(tokens) + 1},
 			expected: false,
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: len(tokens) + 1, Message: "Index out of bounds"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.isAtEnd()
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -380,7 +380,7 @@ func TestPeek(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:     "test curr at middle",
@@ -398,20 +398,20 @@ func TestPeek(t *testing.T) {
 			name:     "test curr at negative index",
 			parser:   Parser{tokens: tokens, curr: -1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: -1, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr beyond tokens length",
 			parser:   Parser{tokens: tokens, curr: len(tokens) + 1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: len(tokens) + 1, Message: "Index out of bounds"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.peek()
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)
@@ -435,13 +435,13 @@ func TestPrevious(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name:     "test curr at start",
 			parser:   Parser{tokens: tokens, curr: 0},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: -1, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at middle",
@@ -453,20 +453,20 @@ func TestPrevious(t *testing.T) {
 			name:     "test curr at negative index",
 			parser:   Parser{tokens: tokens, curr: -1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: -2, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr beyond tokens length",
 			parser:   Parser{tokens: tokens, curr: len(tokens) + 1},
 			expected: token.Token{},
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{Curr: len(tokens), Message: "Index out of bounds"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.previous()
-			if test.err != nil {
+			if test.err != nil || err != nil {
 				assert.Error(t, test.err, err)
 			}
 			assert.Equal(t, test.expected, actual)

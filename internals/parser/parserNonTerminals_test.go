@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"fmt"
 	"testing"
 
+	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/expr"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
@@ -419,7 +419,7 @@ func TestExpression(t *testing.T) {
 			name:     "test empty token list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("invalid access to tokens list: index out of bounds"),
+			err:      &exu_err.ParseError{IsEmpty: true},
 		},
 		{
 			name: "test missing closing parenthesis",
@@ -439,7 +439,10 @@ func TestExpression(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("Expect ')' after expression"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected ')' after expression",
+			},
 		},
 		// FIXME: Go back to this
 		// {
@@ -639,7 +642,10 @@ func TestEquality(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at ="),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				Message: "Expected expression but got =",
+			},
 		},
 		{
 			name: "test incomplete equality with no second comparison",
@@ -653,7 +659,10 @@ func TestEquality(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 		{
 			name: "test invalid equality with invalid first comparison",
@@ -673,7 +682,10 @@ func TestEquality(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at ="),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				Message: "Expected expression but got =",
+			},
 		},
 		{
 			name: "test invalid equality with invalid second comparison",
@@ -695,7 +707,10 @@ func TestEquality(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at )"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 1},
+				Message: "Expected expression but got )",
+			},
 		},
 		{
 			name: "test nested equality",
@@ -785,7 +800,10 @@ func TestEquality(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 	}
 
@@ -930,7 +948,10 @@ func TestComparison(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at >"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 1},
+				Message: "Expected expression but got >",
+			},
 		},
 		{
 			name: "test incomplete comparison with no second term",
@@ -944,7 +965,10 @@ func TestComparison(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 		{
 			name: "test invalid comparison with invalid first term",
@@ -964,7 +988,10 @@ func TestComparison(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at >"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 1},
+				Message: "Expected expression but got >",
+			},
 		},
 		{
 			name: "test invalid comparison with invalid second term",
@@ -986,7 +1013,10 @@ func TestComparison(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at )"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 1},
+				Message: "Expected expression but got )",
+			},
 		},
 		{
 			name: "test nested comparisons",
@@ -1082,7 +1112,10 @@ func TestComparison(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at +"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 1},
+				Message: "Expected expression but got +",
+			},
 		},
 	}
 
@@ -1173,7 +1206,10 @@ func TestTerm(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at +"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 1},
+				Message: "Expected expression but got +",
+			},
 		},
 		{
 			name: "test incomplete term with no second factor",
@@ -1187,7 +1223,10 @@ func TestTerm(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 		{
 			name: "test unary with minus",
@@ -1220,7 +1259,10 @@ func TestTerm(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at /"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.SLASH, Lexeme: "/", Literal: nil, Line: 1},
+				Message: "Expected expression but got /",
+			},
 		},
 		{
 			name: "test invalid term with invalid second factor",
@@ -1242,7 +1284,10 @@ func TestTerm(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at )"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 1},
+				Message: "Expected expression but got )",
+			},
 		},
 		{
 			name: "test nested terms",
@@ -1338,7 +1383,10 @@ func TestTerm(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at *"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 1},
+				Message: "Expected expression but got *",
+			},
 		},
 	}
 
@@ -1433,7 +1481,10 @@ func TestFactor(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at *"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 1},
+				Message: "Expected expression but got *",
+			},
 		},
 		{
 			name: "test invalid factor with no second unary",
@@ -1447,7 +1498,10 @@ func TestFactor(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 		{
 			name: "test invalid factor with invalid first unary",
@@ -1462,7 +1516,10 @@ func TestFactor(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at >"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 1},
+				Message: "Expected expression but got >",
+			},
 		},
 		{
 			name: "test invalid factor with invalid second unary",
@@ -1477,7 +1534,10 @@ func TestFactor(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at ."),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.DOT, Lexeme: ".", Literal: nil, Line: 1},
+				Message: "Expected expression but got .",
+			},
 		},
 		{
 			name: "test nested factor",
@@ -1552,7 +1612,10 @@ func TestFactor(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at "),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected expression but got ",
+			},
 		},
 	}
 
@@ -1678,7 +1741,10 @@ func TestUnary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at +"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 1},
+				Message: "Expected expression but got +",
+			},
 		},
 		{
 			name: "test minus operator with invalid unary",
@@ -1689,7 +1755,10 @@ func TestUnary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at <"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 1},
+				Message: "Expected expression but got <",
+			},
 		},
 		{
 			name: "test not operator with invalid primary",
@@ -1699,7 +1768,10 @@ func TestUnary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at tru"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "tru", Literal: nil, Line: 1},
+				Message: "Expected expression but got tru",
+			},
 		},
 		{
 			name: "test minus operator with invalid primary",
@@ -1709,7 +1781,10 @@ func TestUnary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at +"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 1},
+				Message: "Expected expression but got +",
+			},
 		},
 		{
 			name: "test valid primary expression",
@@ -1735,7 +1810,10 @@ func TestUnary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at <-"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LEFT_ARROW, Lexeme: "<-", Literal: nil, Line: 1},
+				Message: "Expected expression but got <-",
+			},
 		},
 	}
 
@@ -1868,7 +1946,10 @@ func TestPrimary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("Expect ')' after expression"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
+				Message: "Expected ')' after expression",
+			},
 		},
 		{
 			name: "test grouping with invalid expression",
@@ -1879,7 +1960,10 @@ func TestPrimary(t *testing.T) {
 				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			}, curr: 0},
 			expected: nil,
-			err:      fmt.Errorf("expect expression at <"),
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 1},
+				Message: "Expected expression but got <",
+			},
 		},
 	}
 

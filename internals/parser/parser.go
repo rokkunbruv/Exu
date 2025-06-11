@@ -5,6 +5,7 @@ package parser
 import (
 	"fmt"
 
+	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/expr"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
@@ -21,7 +22,7 @@ type Parser struct {
 // Parses the tokens list to its equivalent AST
 func Parse(tokens []token.Token) (expr.Expr, error) {
 	if len(tokens) == 0 {
-		return nil, fmt.Errorf("tokens list is empty")
+		return nil, &exu_err.ParseError{IsEmpty: true}
 	}
 
 	parserObj := Parser{tokens: tokens}
@@ -257,7 +258,7 @@ func (p *Parser) primary() (expr.Expr, error) {
 		}
 
 		// Check for RIGHT_PAREN token if preceded with LEFT_PAREN
-		_, err = p.consume(token.RIGHT_PAREN, "Expect ')' after expression")
+		_, err = p.consume(token.RIGHT_PAREN, "Expected ')' after expression")
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +274,10 @@ func (p *Parser) primary() (expr.Expr, error) {
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("expect expression at %v", currToken.Lexeme)
+	return nil, &exu_err.SyntaxError{
+		Token:   currToken,
+		Message: fmt.Sprintf("Expected expression but got %v", currToken.Lexeme),
+	}
 }
 
 // Return true and moves the curr ptr to the next
@@ -314,8 +318,13 @@ func (p *Parser) consume(t token.TokenType, errorMsg string) (token.Token, error
 		return currToken, nil
 	}
 
+	currToken, err := p.peek()
+	if err != nil {
+		return token.Token{}, err
+	}
+
 	// Throws an error if there is a type mismatch
-	return token.Token{}, fmt.Errorf("%s", errorMsg)
+	return token.Token{}, &exu_err.SyntaxError{Token: currToken, Message: errorMsg}
 }
 
 // Checks if the current token is of a specific type
@@ -369,7 +378,10 @@ func (p *Parser) isAtEnd() (bool, error) {
 // Gets current token
 func (p *Parser) peek() (token.Token, error) {
 	if !p.isCurrInBounds() {
-		return token.Token{}, fmt.Errorf("invalid access to tokens list: index out of bounds")
+		return token.Token{}, &exu_err.ParseError{
+			Curr:    p.curr,
+			Message: "Index out of bounds",
+		}
 	}
 	return p.tokens[p.curr], nil
 }
@@ -379,7 +391,10 @@ func (p *Parser) previous() (token.Token, error) {
 	// We shift the bounds one unit to the right
 	// since we are accessing the previous token
 	if p.curr < 1 || p.curr >= len(p.tokens)+1 {
-		return token.Token{}, fmt.Errorf("invalid access to tokens list: index out of bounds")
+		return token.Token{}, &exu_err.ParseError{
+			Curr:    p.curr - 1,
+			Message: "Index out of bounds",
+		}
 	}
 	return p.tokens[p.curr-1], nil
 }

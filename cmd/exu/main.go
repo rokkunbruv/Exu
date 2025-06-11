@@ -12,36 +12,48 @@ import (
 )
 
 func main() {
-	var hadError bool
-
 	switch {
 	case len(os.Args) > 2:
 		fmt.Println("Correct Usage: exu [script]")
 		os.Exit(1)
 	case len(os.Args) == 2:
-		runFile(os.Args[1], &hadError)
+		runFile(os.Args[1])
 	default:
-		runPrompt(&hadError)
+		runPrompt()
 	}
 }
 
 // Executes the source code if a script path is provided
-func runFile(path string, hadError *bool) {
+func runFile(path string) {
+	if strings.HasSuffix(path, ".exu") {
+		fmt.Println("File error: File type not supported. Use \".exu\"")
+		return
+	}
 
+	f, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("File error: File cannot be read (%w)", err)
+		return
+	}
+
+	fStr := string(f)
+
+	run(fStr)
 }
 
 // Executes the REPL when called
-func runPrompt(hadError *bool) {
+func runPrompt() {
+	linePrefix := ">> "
+
 	fmt.Println("Exu REPL Version 0.1.0")
 
 	reader := bufio.NewScanner(os.Stdin)
 
-	fmt.Print(">> ")
+	fmt.Print(linePrefix)
 	for reader.Scan() {
 		line := cleanLine(reader.Text())
 		run(line)
-		*hadError = false
-		fmt.Print(">> ")
+		fmt.Print(linePrefix)
 	}
 }
 
