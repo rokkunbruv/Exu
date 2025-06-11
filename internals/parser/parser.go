@@ -4,6 +4,7 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 
 	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/expr"
@@ -397,6 +398,57 @@ func (p *Parser) previous() (token.Token, error) {
 		}
 	}
 	return p.tokens[p.curr-1], nil
+}
+
+// Resets expression stack trace whenever keywords are encountered
+func (p *Parser) synchronize() error {
+	keywords := []token.TokenType{
+		token.CLASS, token.FN, token.VAR, token.FOR, token.IF,
+		token.WHILE, token.PRINT, token.RETURN,
+	}
+
+	_, err := p.advance()
+	if err != nil {
+		return err
+	}
+
+	isEOF, err := p.isAtEnd()
+	if err != nil {
+		return err
+	}
+
+	for isEOF {
+		prev, err := p.previous()
+		if err != nil {
+			return err
+		}
+
+		if prev.TokenType == token.SEMICOLON {
+			return nil
+		}
+
+		currToken, err := p.peek()
+		if err != nil {
+			return err
+		}
+
+		if slices.Contains(keywords, currToken.TokenType) {
+			return nil
+		}
+
+		_, err = p.advance()
+		if err != nil {
+			return err
+		}
+
+		// Update isEOF
+		isEOF, err = p.isAtEnd()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Utility function to check if curr is a
