@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
@@ -52,7 +53,7 @@ func Lexer(source string) ([]token.Token, error) {
 		// to the start of the loop on the next iteration, which
 		// are typically cases for comments of multicharacter tokens
 		if peek(source, curr) == utf8.RuneError {
-			return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+			return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 		}
 
 		// Sets the start of the token string to the curr pointer location
@@ -107,7 +108,7 @@ func Lexer(source string) ([]token.Token, error) {
 			// Skip rest of the line if it is a comment (preceded by #)
 			for peek(source, curr) != '\n' && !isAtEnd(source, curr) {
 				if peek(source, curr) == utf8.RuneError {
-					return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+					return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 				}
 
 				curr += n
@@ -128,7 +129,7 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+				return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 			} else {
 				tokenType = token.NOT
 			}
@@ -149,7 +150,7 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+				return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 			} else {
 				tokenType = token.LESS
 			}
@@ -164,7 +165,7 @@ func Lexer(source string) ([]token.Token, error) {
 				curr += n
 				c, n = utf8.DecodeRuneInString(source[curr:])
 			} else if peek(source, curr) == utf8.RuneError {
-				return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+				return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 			} else {
 				tokenType = token.GREATER
 			}
@@ -194,7 +195,7 @@ func Lexer(source string) ([]token.Token, error) {
 					line++
 				}
 				if peek(source, curr) == utf8.RuneError {
-					return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+					return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 				}
 
 				prevN = n
@@ -203,7 +204,7 @@ func Lexer(source string) ([]token.Token, error) {
 			}
 
 			if isAtEnd(source, curr) {
-				return nil, fmt.Errorf("unterminated string at line %v", line)
+				return nil, &exu_err.ScanError{Line: line, Message: "Unterminated string"}
 			}
 
 			// Consume the closing "
@@ -235,7 +236,7 @@ func Lexer(source string) ([]token.Token, error) {
 				// Consume the decimal part of the numeric
 				for isDigit(c) {
 					if peek(source, curr) == utf8.RuneError {
-						return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+						return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 					}
 
 					curr += n
@@ -280,7 +281,7 @@ func Lexer(source string) ([]token.Token, error) {
 
 				for isAlphaNum(c) || c == '_' {
 					if peek(source, curr) == utf8.RuneError {
-						return nil, fmt.Errorf("UTF-8 decoding error at line %v", line)
+						return nil, &exu_err.ScanError{Line: line, Message: "Invalid UTF-8 decoding"}
 					}
 
 					curr += n
@@ -317,7 +318,7 @@ func Lexer(source string) ([]token.Token, error) {
 
 			// Error handling for unexpected characters
 			default:
-				return nil, fmt.Errorf("unexpected %v found at line %v", string(c), line)
+				return nil, &exu_err.ScanError{Line: line, Message: fmt.Sprintf("Unexpected %v found", string(c))}
 			}
 		}
 

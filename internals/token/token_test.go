@@ -12,7 +12,6 @@ func TestTokenToString(t *testing.T) {
 		name     string
 		token    Token
 		expected string
-		err      error
 	}{
 		{
 			name: "test valid token with string literal",
@@ -27,7 +26,6 @@ func TestTokenToString(t *testing.T) {
 				Line: 1,
 			},
 			expected: "IDENTIFIER myVar test",
-			err:      nil,
 		},
 		{
 			name: "test valid token with numeric literal",
@@ -42,7 +40,6 @@ func TestTokenToString(t *testing.T) {
 				Line: 1,
 			},
 			expected: "NUMERIC 42.5 42.5",
-			err:      nil,
 		},
 		{
 			name: "test token with null literal",
@@ -55,13 +52,11 @@ func TestTokenToString(t *testing.T) {
 				Line: 1,
 			},
 			expected: "NULL null ",
-			err:      nil,
 		},
 		{
 			name:     "test zero value token",
 			token:    Token{Literal: nil},
 			expected: "",
-			err:      nil,
 		},
 		{
 			name: "test token with empty lexeme",
@@ -74,7 +69,6 @@ func TestTokenToString(t *testing.T) {
 				Line: 0,
 			},
 			expected: "EOF  ",
-			err:      nil,
 		},
 	}
 

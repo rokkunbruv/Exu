@@ -28,7 +28,7 @@ func TestMatch(t *testing.T) {
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			types:    []token.TokenType{token.PLUS, token.MINUS},
 			expected: false,
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at start and all types match",
@@ -85,7 +85,7 @@ func TestMatch(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.match(test.types...)
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -113,7 +113,7 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       &exu_err.ParseError{IsEmpty: true},
+			err:       &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:      "test curr at start and type matches",
@@ -137,7 +137,10 @@ func TestConsume(t *testing.T) {
 			tokenType: token.EOF,
 			errorMsg:  "expected EOF token",
 			expected:  token.Token{},
-			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: "expected EOF token"},
+			err: &exu_err.SyntaxError{
+				Token:   tokens[len(tokens)-1],
+				Message: "expected EOF token",
+			},
 		},
 		{
 			name:      "test curr in middle and type not matches",
@@ -145,7 +148,10 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       &exu_err.ParseError{Curr: 5, Message: "expected plus token"},
+			err: &exu_err.SyntaxError{
+				Token:   tokens[5],
+				Message: "expected plus token",
+			},
 		},
 		{
 			name:      "test curr at end and type not matches",
@@ -153,7 +159,10 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "expected plus token",
 			expected:  token.Token{},
-			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: "expected plus token"},
+			err: &exu_err.SyntaxError{
+				Token:   tokens[len(tokens)-1],
+				Message: "expected plus token",
+			},
 		},
 		{
 			name:      "test empty error message",
@@ -161,7 +170,10 @@ func TestConsume(t *testing.T) {
 			tokenType: token.PLUS,
 			errorMsg:  "",
 			expected:  token.Token{},
-			err:       &exu_err.ParseError{Curr: len(tokens) - 1, Message: ""},
+			err: &exu_err.SyntaxError{
+				Token:   tokens[5],
+				Message: "",
+			},
 		},
 	}
 
@@ -169,7 +181,7 @@ func TestConsume(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.consume(test.tokenType, test.errorMsg)
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -195,7 +207,7 @@ func TestCheck(t *testing.T) {
 			parser:    Parser{tokens: []token.Token{}, curr: 0},
 			tokenType: token.PLUS,
 			expected:  false,
-			err:       &exu_err.ParseError{IsEmpty: true},
+			err:       &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:      "test curr at start and type matches",
@@ -238,7 +250,7 @@ func TestCheck(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.check(test.tokenType)
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -261,7 +273,7 @@ func TestAdvance(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at start",
@@ -299,7 +311,7 @@ func TestAdvance(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.advance()
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -322,7 +334,7 @@ func TestIsAtEnd(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: false,
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at start",
@@ -357,7 +369,7 @@ func TestIsAtEnd(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.isAtEnd()
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -380,7 +392,7 @@ func TestPeek(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at middle",
@@ -412,7 +424,7 @@ func TestPeek(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.peek()
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -435,7 +447,7 @@ func TestPrevious(t *testing.T) {
 			name:     "test empty tokens list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: token.Token{},
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: -1, Message: "Index out of bounds"},
 		},
 		{
 			name:     "test curr at start",
@@ -467,7 +479,7 @@ func TestPrevious(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.previous()
 			if test.err != nil || err != nil {
-				assert.Error(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})

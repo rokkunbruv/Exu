@@ -6,6 +6,16 @@ import (
 	"github.com/rokkunbruv/internals/token"
 )
 
+// Invokes on lexing errors (unsupported characters, unterminated strings. utf-8 decoding errors)
+type ScanError struct {
+	Line    int
+	Message string
+}
+
+func (e *ScanError) Error() string {
+	return fmt.Sprintf("Scan error on line %v: %v", e.Line, e.Message)
+}
+
 // Invokes on syntax errors (invalid expressions)
 type SyntaxError struct {
 	Token   token.Token

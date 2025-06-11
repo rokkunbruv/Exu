@@ -1,11 +1,11 @@
 package lexer
 
 import (
-	"fmt"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/attic-labs/testify/assert"
+	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
 )
@@ -102,7 +102,7 @@ func TestLexer(t *testing.T) {
 			name:     "test edge cases: unicode, invalid identifiers, string edge cases",
 			source:   "id你好 1var .123 42. whiile \"test\n\" @#$",
 			expected: nil,
-			err:      fmt.Errorf("unexpected 你 found at line 0"),
+			err:      &exu_err.ScanError{Line: 0, Message: "Unexpected 你 found"},
 		},
 		{
 			name:   "test whitespace handling and comment",
@@ -121,7 +121,7 @@ func TestLexer(t *testing.T) {
 			name:     "test string handling and escapes",
 			source:   "str: \"hello\nworld\" \"unterminated",
 			expected: nil,
-			err:      fmt.Errorf("unterminated string at line 1"),
+			err:      &exu_err.ScanError{Line: 1, Message: "Unterminated string"},
 		},
 		{
 			name:   "test adjacent tokens and special identifiers",
@@ -153,7 +153,7 @@ func TestLexer(t *testing.T) {
 			name:     "test unterminated strings and string escapes",
 			source:   "str1: \"hello\nstr2: \"world\n\nstr3: \"incomplete",
 			expected: nil,
-			err:      fmt.Errorf("unterminated string at line 3"),
+			err:      &exu_err.ScanError{Line: 3, Message: "Unterminated string"},
 		},
 		{
 			name:   "test adjacent comparison operators",
@@ -223,19 +223,17 @@ func TestLexer(t *testing.T) {
 			name:     "test mixed string termination and escape sequences",
 			source:   "str1: \"valid\n\" + str2: \"invalid\n\" + str3: \"unterminated",
 			expected: nil,
-			err:      fmt.Errorf("unterminated string at line 2"),
+			err:      &exu_err.ScanError{Line: 2, Message: "Unterminated string"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := Lexer(test.source)
-			if test.err != nil {
-				assert.Equal(t, test.err, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, test.expected, actual)
+			if test.err != nil || err != nil {
+				assert.EqualError(t, test.err, err.Error())
 			}
+			assert.Equal(t, test.expected, actual)
 		})
 	}
 }

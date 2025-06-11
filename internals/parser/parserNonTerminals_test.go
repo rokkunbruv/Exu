@@ -419,7 +419,7 @@ func TestExpression(t *testing.T) {
 			name:     "test empty token list",
 			parser:   Parser{tokens: []token.Token{}, curr: 0},
 			expected: nil,
-			err:      &exu_err.ParseError{IsEmpty: true},
+			err:      &exu_err.ParseError{Curr: 0, Message: "Index out of bounds"},
 		},
 		{
 			name: "test missing closing parenthesis",
@@ -559,7 +559,7 @@ func TestExpression(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -811,7 +811,7 @@ func TestEquality(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -1123,7 +1123,7 @@ func TestComparison(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -1394,7 +1394,7 @@ func TestTerm(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -1623,7 +1623,7 @@ func TestFactor(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil || err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -1821,7 +1821,7 @@ func TestUnary(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil || err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
@@ -1971,7 +1971,7 @@ func TestPrimary(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := test.parser.expression()
 			if test.err != nil || err != nil {
-				assert.Equal(t, test.err, err)
+				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
 		})
