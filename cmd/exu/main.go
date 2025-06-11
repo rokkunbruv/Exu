@@ -50,17 +50,22 @@ func run(line string) {
 	tokens, err := lexer.Lexer(line)
 	if err != nil {
 		// error handling
-		fmt.Println(err.Error())
+		fmt.Println(err)
+		return
 	}
 
 	exp, err := parser.Parse(tokens)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
+		return
 	}
 
-	expStr, err := ast.ToString(exp)
+	astStrObj := ast.AstString{Expr: exp}
+
+	expStr, err := astStrObj.Generate()
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
+		return
 	}
 	fmt.Println(expStr)
 }

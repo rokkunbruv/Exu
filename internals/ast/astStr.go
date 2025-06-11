@@ -2,58 +2,20 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rokkunbruv/internals/expr"
-	"github.com/rokkunbruv/internals/literal"
-	"github.com/rokkunbruv/internals/token"
 )
 
-type AstString struct{}
-
-// Converts an AST to its string representation
-// For this string representation implementation,
-// trees and subtrees are enclosed in parentheses
-// wherein the first item represents the parent
-// of that tree/subtree
-func Main() {
-	expression := &expr.Binary{
-		Left: &expr.Unary{
-			Operator: token.Token{
-				TokenType: token.MINUS, Lexeme: "-", Literal: nil, Line: 1,
-			},
-			Right: &expr.Literal{
-				Value: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(123)
-					return lit
-				}(),
-			},
-		},
-		Operator: token.Token{
-			TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 1,
-		},
-		Right: &expr.Grouping{
-			Expression: &expr.Literal{
-				Value: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(45.67)
-					return lit
-				}(),
-			},
-		},
-	}
-
-	str, err := ToString(expression)
-	if err != nil {
-		fmt.Print(err)
-	}
-	fmt.Println(str)
+type AstString struct {
+	indent string    // Sets the indentation string as the visitor traverses to the AST
+	Expr   expr.Expr // The expression tree to be converted to a string
 }
 
-func ToString(expr expr.Expr) (string, error) {
-	visitor := &AstString{}
+func (a *AstString) Generate() (string, error) {
+	visitor := &AstString{indent: ""}
 
-	strObj, err := expr.Accept(visitor)
+	strObj, err := a.Expr.Accept(visitor)
 	if err != nil {
 		return "", err
 	}
@@ -66,11 +28,11 @@ func ToString(expr expr.Expr) (string, error) {
 }
 
 func (a *AstString) VisitBinaryExpr(expr *expr.Binary) (any, error) {
-	return parenthesize(expr.Operator.Lexeme, expr.Left, expr.Right)
+	return generateSubTree(a, expr.Operator.Lexeme, expr.Left, expr.Right)
 }
 
 func (a *AstString) VisitGroupingExpr(expr *expr.Grouping) (any, error) {
-	return parenthesize("group", expr.Expression)
+	return generateSubTree(a, "()", expr.Expression)
 }
 
 func (a *AstString) VisitLiteralExpr(expr *expr.Literal) (any, error) {
@@ -78,24 +40,44 @@ func (a *AstString) VisitLiteralExpr(expr *expr.Literal) (any, error) {
 }
 
 func (a *AstString) VisitUnaryExpr(expr *expr.Unary) (any, error) {
-	return parenthesize(expr.Operator.Lexeme, expr.Right)
+	return generateSubTree(a, expr.Operator.Lexeme, expr.Right)
 }
 
-func parenthesize(name string, exprs ...expr.Expr) (string, error) {
-	visitor := &AstString{}
+func generateSubTree(a *AstString, parentStr string, exprs ...expr.Expr) (string, error) {
 	var buf string
 
-	for _, exp := range exprs {
-		expObj, err := exp.Accept(visitor)
+	for i, exp := range exprs {
+		// Add indentation string
+		if i == len(exprs)-1 {
+			a.indent += "   "
+		} else {
+			a.indent += "│  "
+		}
+
+		expObj, err := exp.Accept(a)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("%w\ninvoked from generateSubTree(%v, %v, %v)", err, a, parentStr, exprs)
 		}
 		expStr, ok := expObj.(string)
 		if !ok {
 			return "", fmt.Errorf("invalid parsing: object is not string")
 		}
-		buf += fmt.Sprintf(" %v", expStr)
+
+		// Undo indentation string
+		if i == len(exprs)-1 {
+			a.indent = strings.TrimSuffix(a.indent, "   ")
+		} else {
+			a.indent = strings.TrimSuffix(a.indent, "│  ")
+		}
+
+		// Set branch junction
+		branch := "├─"
+		if i == len(exprs)-1 {
+			branch = "└─"
+		}
+
+		buf += fmt.Sprintf("\n%v%v %v", a.indent, branch, expStr)
 	}
 
-	return fmt.Sprintf("(%v%v)", name, buf), nil
+	return fmt.Sprintf("%v%v", parentStr, buf), nil
 }
