@@ -1,3 +1,5 @@
+// The parser parses the tokens list in accordance to the defined grammar in grammar.md
+
 package parser
 
 import (
@@ -8,12 +10,20 @@ import (
 	"github.com/rokkunbruv/internals/token"
 )
 
+// Parser struct to keep track of the
+// tokens list and curr pointer
+// as it generates the AST
 type Parser struct {
 	tokens []token.Token
 	curr   int
 }
 
+// Parses the tokens list to its equivalent AST
 func Parse(tokens []token.Token) (expr.Expr, error) {
+	if len(tokens) == 0 {
+		return nil, fmt.Errorf("tokens list is empty")
+	}
+
 	parserObj := Parser{tokens: tokens}
 	return parserObj.expression()
 }
@@ -28,13 +38,30 @@ func (p *Parser) equality() (expr.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(token.EQUAL, token.NOT_EQUAL) {
-		operator := p.previous()
+	// Check for EQUAL or NOT_EQUAL tokens
+	isEquality, err := p.match(token.EQUAL, token.NOT_EQUAL)
+	if err != nil {
+		return nil, err
+	}
+
+	for isEquality {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
 		right, err := p.comparison()
 		if err != nil {
 			return nil, err
 		}
+
 		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+
+		// Update isEquality
+		isEquality, err = p.match(token.EQUAL, token.NOT_EQUAL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return exp, nil
@@ -46,13 +73,30 @@ func (p *Parser) comparison() (expr.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL) {
-		operator := p.previous()
+	// Check for comparison tokens
+	isComparison, err := p.match(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL)
+	if err != nil {
+		return nil, err
+	}
+
+	for isComparison {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
 		right, err := p.term()
 		if err != nil {
 			return nil, err
 		}
+
 		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+
+		// Update isComparison
+		isComparison, err = p.match(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return exp, nil
@@ -64,13 +108,30 @@ func (p *Parser) term() (expr.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(token.MINUS, token.PLUS) {
-		operator := p.previous()
+	// Check for MINUS or PLUS tokens
+	isTermOp, err := p.match(token.MINUS, token.PLUS)
+	if err != nil {
+		return nil, err
+	}
+
+	for isTermOp {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
 		right, err := p.factor()
 		if err != nil {
 			return nil, err
 		}
+
 		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+
+		// Update isTermOp
+		isTermOp, err = p.match(token.MINUS, token.PLUS)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return exp, nil
@@ -82,25 +143,53 @@ func (p *Parser) factor() (expr.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(token.SLASH, token.STAR) {
-		operator := p.previous()
+	// Check for SLASH or STAR tokens
+	isFactorOp, err := p.match(token.SLASH, token.STAR)
+	if err != nil {
+		return nil, err
+	}
+
+	for isFactorOp {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
 		right, err := p.unary()
 		if err != nil {
 			return nil, err
 		}
+
 		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+
+		// Update isFactorOp
+		isFactorOp, err = p.match(token.SLASH, token.STAR)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return exp, nil
 }
 
 func (p *Parser) unary() (expr.Expr, error) {
-	if p.match(token.NOT, token.MINUS) {
-		operator := p.previous()
+	// Check for NOT or MINUS tokens
+	isUnary, err := p.match(token.NOT, token.MINUS)
+	if err != nil {
+		return nil, err
+	}
+
+	if isUnary {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
 		right, err := p.unary()
 		if err != nil {
 			return nil, err
 		}
+
 		return &expr.Unary{Operator: operator, Right: right}, nil
 	}
 
@@ -108,81 +197,198 @@ func (p *Parser) unary() (expr.Expr, error) {
 }
 
 func (p *Parser) primary() (expr.Expr, error) {
-	if p.match(token.FALSE) {
+	// Check for FALSE token
+	isFalse, err := p.match(token.FALSE)
+	if err != nil {
+		return nil, err
+	}
+	if isFalse {
 		return &expr.Literal{Value: func() *literal.BoolLiteral {
 			lit := &literal.BoolLiteral{}
 			lit.SetVal(false)
 			return lit
 		}()}, nil
 	}
-	if p.match(token.TRUE) {
+
+	// Check for TRUE token
+	isTrue, err := p.match(token.TRUE)
+	if err != nil {
+		return nil, err
+	}
+	if isTrue {
 		return &expr.Literal{Value: func() *literal.BoolLiteral {
 			lit := &literal.BoolLiteral{}
 			lit.SetVal(true)
 			return lit
 		}()}, nil
 	}
-	if p.match(token.NULL) {
+
+	// Check for NULL token
+	isNull, err := p.match(token.NULL)
+	if err != nil {
+		return nil, err
+	}
+	if isNull {
 		return &expr.Literal{Value: nil}, nil
 	}
 
-	if p.match(token.NUMERIC, token.STRING) {
-		prev := p.previous()
+	// Check for NUMERIC or STRING tokens
+	isNumOrStr, err := p.match(token.NUMERIC, token.STRING)
+	if err != nil {
+		return nil, err
+	}
+	if isNumOrStr {
+		prev, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
 		return &expr.Literal{Value: prev.Literal}, nil
 	}
 
-	if p.match(token.LEFT_PAREN) {
+	// Check for LEFT_PAREN token
+	isLeftParen, err := p.match(token.LEFT_PAREN)
+	if err != nil {
+		return nil, err
+	}
+	if isLeftParen {
 		exp, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
-		p.consume(token.RIGHT_PAREN, "Expect ')' after expression")
+
+		// Check for RIGHT_PAREN token if preceded with LEFT_PAREN
+		_, err = p.consume(token.RIGHT_PAREN, "Expect ')' after expression")
+		if err != nil {
+			return nil, err
+		}
+
 		return &expr.Grouping{Expression: exp}, nil
 	}
 
-	currToken := p.peek()
-	return nil, fmt.Errorf("expect expression at %v", currToken.ToString())
+	// Throws an error on the current token
+	// if it doesnt match with any of the
+	// above conditions
+	currToken, err := p.peek()
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("expect expression at %v", currToken.Lexeme)
 }
 
-func (p *Parser) match(types ...token.TokenType) bool {
+// Return true and moves the curr ptr to the next
+// element in tokens if the curr token matches with
+// any of the listed types
+func (p *Parser) match(types ...token.TokenType) (bool, error) {
 	for _, t := range types {
-		if p.check(t) {
-			p.advance()
-			return true
+		isType, err := p.check(t)
+		if err != nil {
+			return false, err
+		}
+		if isType {
+			_, err := p.advance()
+			if err != nil {
+				return false, err
+			}
+			return true, nil
 		}
 	}
-	return false
+
+	return false, nil
 }
 
+// Returns the curr token and moves the curr ptr to
+// the next token if the curr token matches with
+// the type
 func (p *Parser) consume(t token.TokenType, errorMsg string) (token.Token, error) {
-	if p.check(t) {
-		return p.advance(), nil
+	isType, err := p.check(t)
+	if err != nil {
+		return token.Token{}, err
 	}
+
+	if isType {
+		currToken, err := p.advance()
+		if err != nil {
+			return token.Token{}, err
+		}
+		return currToken, nil
+	}
+
+	// Throws an error if there is a type mismatch
 	return token.Token{}, fmt.Errorf("%s", errorMsg)
 }
 
-func (p *Parser) check(t token.TokenType) bool {
-	if p.isAtEnd() {
-		return false
+// Checks if the current token is of a specific type
+func (p *Parser) check(t token.TokenType) (bool, error) {
+	atEnd, err := p.isAtEnd()
+	if err != nil {
+		return false, err
 	}
-	return p.peek().TokenType == t
+	if atEnd {
+		return false, nil
+	}
+
+	currToken, err := p.peek()
+	if err != nil {
+		return false, err
+	}
+
+	return currToken.TokenType == t, nil
 }
 
-func (p *Parser) advance() token.Token {
-	if !p.isAtEnd() {
+// Pops the current token and moves curr ptr
+// to the next token
+func (p *Parser) advance() (token.Token, error) {
+	atEnd, err := p.isAtEnd()
+	if err != nil {
+		return token.Token{}, err
+	}
+	// Moves the curr ptr to the next token
+	// until it reaches EOF token in which
+	// the curr ptr will stop moving at that point
+	if !atEnd {
 		p.curr++
 	}
-	return p.previous()
+
+	prev, err := p.previous()
+	if err != nil {
+		return token.Token{}, err
+	}
+
+	return prev, nil
 }
 
-func (p *Parser) isAtEnd() bool {
-	return p.peek().TokenType == token.EOF
+func (p *Parser) isAtEnd() (bool, error) {
+	currToken, err := p.peek()
+	if err != nil {
+		return false, err
+	}
+	return currToken.TokenType == token.EOF, nil
 }
 
-func (p *Parser) peek() token.Token {
-	return p.tokens[p.curr]
+// Gets current token
+func (p *Parser) peek() (token.Token, error) {
+	if !p.isCurrInBounds() {
+		return token.Token{}, fmt.Errorf("invalid access to tokens list: index out of bounds")
+	}
+	return p.tokens[p.curr], nil
 }
 
-func (p *Parser) previous() token.Token {
-	return p.tokens[p.curr-1]
+// Gets previous token
+func (p *Parser) previous() (token.Token, error) {
+	// We shift the bounds one unit to the right
+	// since we are accessing the previous token
+	if p.curr < 1 || p.curr >= len(p.tokens)+1 {
+		return token.Token{}, fmt.Errorf("invalid access to tokens list: index out of bounds")
+	}
+	return p.tokens[p.curr-1], nil
+}
+
+// Utility function to check if curr is a
+// valid index in tokens
+func (p *Parser) isCurrInBounds() bool {
+	if p.curr < 0 || p.curr >= len(p.tokens) {
+		return false
+	}
+	return true
 }
