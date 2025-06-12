@@ -231,7 +231,7 @@ func (p *Parser) primary() (expr.Expr, error) {
 		return nil, err
 	}
 	if isNull {
-		return &expr.Literal{Value: nil}, nil
+		return &expr.Literal{Value: &literal.NullLiteral{}}, nil
 	}
 
 	// Check for NUMERIC or STRING tokens

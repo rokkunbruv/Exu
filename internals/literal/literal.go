@@ -28,6 +28,10 @@ func (n *NumericLiteral) Type() string {
 	return "Numeric"
 }
 
+func GenerateNumericLiteral(val float64) *NumericLiteral {
+	return &NumericLiteral{val: val}
+}
+
 func (n *NumericLiteral) Val() (float64, error) {
 	if (*n).IsNull {
 		return 0, fmt.Errorf("invalid access to a null numeric literal")
@@ -57,6 +61,10 @@ func (s *StringLiteral) ToString() string {
 
 func (s *StringLiteral) Type() string {
 	return "String"
+}
+
+func GenerateStringLiteral(val string) *StringLiteral {
+	return &StringLiteral{val: val}
 }
 
 func (s *StringLiteral) Val() (string, error) {
@@ -93,6 +101,10 @@ func (n *BoolLiteral) Type() string {
 	return "Bool"
 }
 
+func GenerateBoolLiteral(val bool) *BoolLiteral {
+	return &BoolLiteral{val: val}
+}
+
 func (b *BoolLiteral) Val() (bool, error) {
 	if (*b).IsNull {
 		return false, fmt.Errorf("invalid access to a null bool literal")
@@ -105,4 +117,19 @@ func (b *BoolLiteral) SetVal(newVal bool) {
 		(*b).IsNull = false
 	}
 	(*b).val = newVal
+}
+
+// Special literal for null values
+type NullLiteral struct{}
+
+func (n *NullLiteral) ToString() string {
+	return "null"
+}
+
+func (n *NullLiteral) Type() string {
+	return "Null"
+}
+
+func (n *NullLiteral) Val() any {
+	return nil
 }
