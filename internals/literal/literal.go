@@ -8,6 +8,7 @@ import (
 // Literal structs have IsNull field (true if null)
 type Literal interface {
 	ToString() string
+	Type() string
 }
 
 // Numeric Literal
@@ -21,6 +22,10 @@ func (n *NumericLiteral) ToString() string {
 		return ""
 	}
 	return fmt.Sprint((*n).val)
+}
+
+func (n *NumericLiteral) Type() string {
+	return "Numeric"
 }
 
 func (n *NumericLiteral) Val() (float64, error) {
@@ -48,6 +53,10 @@ func (s *StringLiteral) ToString() string {
 		return ""
 	}
 	return (*s).val
+}
+
+func (s *StringLiteral) Type() string {
+	return "String"
 }
 
 func (s *StringLiteral) Val() (string, error) {
@@ -78,6 +87,10 @@ func (b *BoolLiteral) ToString() string {
 		return "true"
 	}
 	return "false"
+}
+
+func (n *BoolLiteral) Type() string {
+	return "Bool"
 }
 
 func (b *BoolLiteral) Val() (bool, error) {
