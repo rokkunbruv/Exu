@@ -42,3 +42,13 @@ func (e *ParseError) Error() string {
 	}
 	return fmt.Sprintf("Parse error on index %v in tokens: %v", e.Curr, e.Message)
 }
+
+// Invokes on runtime errors (invalid operation between types)
+type RuntimeError struct {
+	Token   token.Token
+	Message string
+}
+
+func (e *RuntimeError) Error() string {
+	return fmt.Sprintf("Runtime error on line %v: %v", e.Token.Line, e.Message)
+}
