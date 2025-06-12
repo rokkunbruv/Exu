@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rokkunbruv/internals/ast"
+	"github.com/rokkunbruv/internals/interpreter"
 	"github.com/rokkunbruv/internals/lexer"
 	"github.com/rokkunbruv/internals/parser"
 )
@@ -25,7 +25,7 @@ func main() {
 
 // Executes the source code if a script path is provided
 func runFile(path string) {
-	if strings.HasSuffix(path, ".exu") {
+	if !strings.HasSuffix(path, ".exu") {
 		fmt.Println("File error: File type not supported. Use \".exu\"")
 		return
 	}
@@ -66,20 +66,20 @@ func run(line string) {
 		return
 	}
 
+	// Parse tokens to an AST
 	exp, err := parser.Parse(tokens)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	astStrObj := ast.AstString{Expr: exp}
-
-	expStr, err := astStrObj.Generate()
+	// Evaluate AST
+	intr := interpreter.Interpreter{Expression: exp}
+	err = intr.Interpret()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(expStr)
 }
 
 func cleanLine(line string) string {
