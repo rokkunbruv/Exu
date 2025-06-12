@@ -33,7 +33,7 @@ func (i *Interpreter) evaluate(exp expr.Expr) (literal.Literal, error) {
 
 	lit, ok := litObj.(literal.Literal)
 	if !ok {
-		return nil, fmt.Errorf("")
+		return nil, &exu_err.CastError{Message: "Evaluated result of expression does not result to a literal"}
 	}
 
 	return lit, err
@@ -60,6 +60,7 @@ func (i *Interpreter) VisitUnaryExpr(exp *expr.Unary) (any, error) {
 
 	switch exp.Operator.TokenType {
 	case token.NOT:
+		// Only allow boolean expressions to use !
 		b, err := toBool(val)
 		if err != nil {
 			return nil, &exu_err.RuntimeError{
@@ -73,6 +74,7 @@ func (i *Interpreter) VisitUnaryExpr(exp *expr.Unary) (any, error) {
 
 		return negateB, nil
 	case token.MINUS:
+		// Only allow numeric expressions to use -
 		num, err := toNumeric(val)
 		if err != nil {
 			return nil, &exu_err.RuntimeError{
@@ -102,8 +104,9 @@ func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
 	}
 
 	switch exp.Operator.TokenType {
+	// Only allow boolean and null expressions to use equality operators
 	case token.NOT_EQUAL:
-		lBool, rBool, err := toTwoBools(left, right)
+		result, err := isEqual(left, right)
 		if err != nil {
 			return nil, &exu_err.RuntimeError{
 				Token:   exp.Operator,
@@ -112,12 +115,12 @@ func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
 		}
 
 		newBool := &literal.BoolLiteral{}
-		newBool.SetVal(lBool != rBool)
+		newBool.SetVal(!result)
 
 		return newBool, nil
 
 	case token.EQUAL:
-		lBool, rBool, err := toTwoBools(left, right)
+		result, err := isEqual(left, right)
 		if err != nil {
 			return nil, &exu_err.RuntimeError{
 				Token:   exp.Operator,
@@ -126,10 +129,11 @@ func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
 		}
 
 		newBool := &literal.BoolLiteral{}
-		newBool.SetVal(lBool == rBool)
+		newBool.SetVal(result)
 
 		return newBool, nil
 
+	// Only allow numeric expressions to use comparison operators
 	case token.GREATER:
 		lNum, rNum, err := toTwoNumerics(left, right)
 		if err != nil {
@@ -186,6 +190,8 @@ func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
 
 		return newBool, nil
 
+	// Only allow numeric expressions to use arithmetic operators
+	// except for strings which can use the + operator for concatenation
 	case token.MINUS:
 		lNum, rNum, err := toTwoNumerics(left, right)
 		if err != nil {
@@ -254,6 +260,43 @@ func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
 	return nil, nil
 }
 
+// Utility function to check if two literals of the same type are equal;
+// throws an error if two literals are not of the same type (except for null values)
+func isEqual(lit1 literal.Literal, lit2 literal.Literal) (bool, error) {
+	// Check if either expressions are null
+	_, ok1 := lit1.(*literal.NullLiteral)
+	_, ok2 := lit2.(*literal.NullLiteral)
+
+	// Return true if both expressions are null
+	// else return false if either expression is null
+	if ok1 && ok2 {
+		return true, nil
+	} else if ok1 || ok2 {
+		return false, nil
+	}
+
+	// Equality check for two bool literals
+	bool1, bool2, err := toTwoBools(lit1, lit2)
+	if err == nil {
+		return bool1 == bool2, nil
+	}
+
+	// Equality check for two string literals
+	str1, str2, err := toTwoStrs(lit1, lit2)
+	if err == nil {
+		return str1 == str2, nil
+	}
+
+	// Equality check for two numeric literals
+	num1, num2, err := toTwoNumerics(lit1, lit2)
+	if err == nil {
+		return num1 == num2, nil
+	}
+
+	return false, fmt.Errorf("")
+}
+
+// Utility function to convert a literal to a numeric literal
 func toNumeric(lit literal.Literal) (float64, error) {
 	num, ok := lit.(*literal.NumericLiteral)
 	if !ok {
@@ -262,6 +305,7 @@ func toNumeric(lit literal.Literal) (float64, error) {
 	return num.Val()
 }
 
+// Utility function to convert two literals to two numeric literals
 func toTwoNumerics(lit1 literal.Literal, lit2 literal.Literal) (float64, float64, error) {
 	num1, err := toNumeric(lit1)
 	if err != nil {
@@ -276,6 +320,7 @@ func toTwoNumerics(lit1 literal.Literal, lit2 literal.Literal) (float64, float64
 	return num1, num2, nil
 }
 
+// Utility function to convert a literal to a bool literal
 func toBool(lit literal.Literal) (bool, error) {
 	boolean, ok := lit.(*literal.BoolLiteral)
 	if !ok {
@@ -284,6 +329,7 @@ func toBool(lit literal.Literal) (bool, error) {
 	return boolean.Val()
 }
 
+// Utility function to convert two literals to two bool literals
 func toTwoBools(lit1 literal.Literal, lit2 literal.Literal) (bool, bool, error) {
 	bool1, err := toBool(lit1)
 	if err != nil {
@@ -298,6 +344,7 @@ func toTwoBools(lit1 literal.Literal, lit2 literal.Literal) (bool, bool, error) 
 	return bool1, bool2, nil
 }
 
+// Utility function to convert a literal to a string literal
 func toStr(lit literal.Literal) (string, error) {
 	str, ok := lit.(*literal.StringLiteral)
 	if !ok {
@@ -306,6 +353,7 @@ func toStr(lit literal.Literal) (string, error) {
 	return str.Val()
 }
 
+// Utility function to convert two literals to two string literals
 func toTwoStrs(lit1 literal.Literal, lit2 literal.Literal) (string, string, error) {
 	str1, err := toStr(lit1)
 	if err != nil {

@@ -52,3 +52,12 @@ type RuntimeError struct {
 func (e *RuntimeError) Error() string {
 	return fmt.Sprintf("Runtime error on line %v: %v", e.Token.Line, e.Message)
 }
+
+// Invokes on interface cast errors (unexpected type)
+type CastError struct {
+	Message string
+}
+
+func (e *CastError) Error() string {
+	return fmt.Sprintf("Cast error: %v", e.Message)
+}
