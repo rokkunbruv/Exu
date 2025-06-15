@@ -28,7 +28,7 @@ func Lexer(source string) ([]token.Token, error) {
 		"class":  token.CLASS,
 		"super":  token.SUPER,
 		"self":   token.SELF,
-		"var":    token.VAR,
+		"let":    token.LET,
 	}
 
 	// Pointers for iterating over the source code

@@ -7,8 +7,9 @@ import (
 	"slices"
 
 	exu_err "github.com/rokkunbruv/internals/err"
-	"github.com/rokkunbruv/internals/expr"
+	"github.com/rokkunbruv/internals/expression"
 	"github.com/rokkunbruv/internals/literal"
+	"github.com/rokkunbruv/internals/statement"
 	"github.com/rokkunbruv/internals/token"
 )
 
@@ -16,25 +17,220 @@ import (
 // tokens list and curr pointer
 // as it generates the AST
 type Parser struct {
-	tokens []token.Token
-	curr   int
+	Tokens []token.Token
+	Curr   int
 }
 
 // Parses the tokens list to its equivalent AST
-func Parse(tokens []token.Token) (expr.Expr, error) {
-	if len(tokens) == 0 {
-		return nil, &exu_err.ParseError{IsEmpty: true}
+func (p *Parser) Parse() ([]statement.Stmt, error) {
+	statements := []statement.Stmt{}
+
+	atEnd, err := p.isAtEnd()
+	if err != nil {
+		return nil, err
 	}
 
-	parserObj := Parser{tokens: tokens}
-	return parserObj.expression()
+	for !atEnd {
+		statement, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+
+		statements = append(statements, statement)
+
+		atEnd, err = p.isAtEnd()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return statements, nil
 }
 
-func (p *Parser) expression() (expr.Expr, error) {
-	return p.equality()
+func (p *Parser) declaration() (statement.Stmt, error) {
+	// Check let keyword
+	isLet, err := p.match(token.LET)
+	if err != nil {
+		// Exits expression tree
+		sync_err := p.synchronize()
+
+		if sync_err != nil {
+			return nil, sync_err
+		}
+
+		return nil, err
+	}
+
+	if isLet {
+		return p.varDeclaration()
+	}
+
+	return p.statement()
 }
 
-func (p *Parser) equality() (expr.Expr, error) {
+// Parses variable declarations
+func (p *Parser) varDeclaration() (statement.Stmt, error) {
+	varName, err := p.consume(token.IDENTIFIER, "Expected variable name")
+	if err != nil {
+		return nil, err
+	}
+
+	var initializer expression.Expr
+
+	isColon, err := p.match(token.COLON)
+	if err != nil {
+		return nil, err
+	}
+
+	if isColon {
+		initializer, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, err = p.consume(token.SEMICOLON, "Expected \";\" after variable declaration.")
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.Let{Name: varName, Initializer: initializer}, nil
+}
+
+func (p *Parser) statement() (statement.Stmt, error) {
+	// Check for print keyword
+	isPrint, err := p.match(token.PRINT)
+	if err != nil {
+		return nil, err
+	}
+
+	if isPrint {
+		return p.printStatement()
+	}
+
+	// Check for blocks
+	isBlock, err := p.match(token.LEFT_BRACE)
+	if err != nil {
+		return nil, err
+	}
+
+	if isBlock {
+		statements, err := p.block()
+		if err != nil {
+			return nil, err
+		}
+
+		return &statement.Block{Statements: statements}, nil
+	}
+
+	return p.exprStatement()
+}
+
+func (p *Parser) block() ([]statement.Stmt, error) {
+	statements := []statement.Stmt{}
+
+	for {
+		isRightBrace, err := p.check(token.RIGHT_BRACE)
+		if err != nil {
+			return nil, err
+		}
+
+		atEnd, err := p.isAtEnd()
+		if err != nil {
+			return nil, err
+		}
+
+		if isRightBrace || atEnd {
+			break
+		}
+
+		statement, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+
+		statements = append(statements, statement)
+	}
+
+	_, err := p.consume(token.RIGHT_BRACE, "Expected \"}\" after block.")
+	if err != nil {
+		return nil, err
+	}
+
+	return statements, nil
+}
+
+func (p *Parser) printStatement() (statement.Stmt, error) {
+	value, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(token.SEMICOLON, "Expected \";\" after expression.")
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.Print{Expression: value}, nil
+}
+
+func (p *Parser) exprStatement() (statement.Stmt, error) {
+	exp, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = p.consume(token.SEMICOLON, "Expected \";\" after expression.")
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.Expression{Expression: exp}, nil
+}
+
+func (p *Parser) expression() (expression.Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for COLON token for assignment
+	isColon, err := p.match(token.COLON)
+	if err != nil {
+		return nil, err
+	}
+
+	if isColon {
+		equals, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
+		// Obtain r-value (a literal)
+		value, err := p.equality()
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if l-value is a variable
+		variable, ok := expr.(*expression.Variable)
+		if !ok {
+			return nil, &exu_err.SyntaxError{
+				Token:   equals,
+				Message: "Invalid assignment target",
+			}
+		}
+
+		return &expression.Assignment{
+			Name:  variable.Name,
+			Value: value,
+		}, nil
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) equality() (expression.Expr, error) {
 	exp, err := p.comparison()
 	if err != nil {
 		return nil, err
@@ -57,7 +253,7 @@ func (p *Parser) equality() (expr.Expr, error) {
 			return nil, err
 		}
 
-		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+		exp = &expression.Binary{Left: exp, Operator: operator, Right: right}
 
 		// Update isEquality
 		isEquality, err = p.match(token.EQUAL, token.NOT_EQUAL)
@@ -69,7 +265,7 @@ func (p *Parser) equality() (expr.Expr, error) {
 	return exp, nil
 }
 
-func (p *Parser) comparison() (expr.Expr, error) {
+func (p *Parser) comparison() (expression.Expr, error) {
 	exp, err := p.term()
 	if err != nil {
 		return nil, err
@@ -92,7 +288,7 @@ func (p *Parser) comparison() (expr.Expr, error) {
 			return nil, err
 		}
 
-		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+		exp = &expression.Binary{Left: exp, Operator: operator, Right: right}
 
 		// Update isComparison
 		isComparison, err = p.match(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL)
@@ -104,7 +300,7 @@ func (p *Parser) comparison() (expr.Expr, error) {
 	return exp, nil
 }
 
-func (p *Parser) term() (expr.Expr, error) {
+func (p *Parser) term() (expression.Expr, error) {
 	exp, err := p.factor()
 	if err != nil {
 		return nil, err
@@ -127,7 +323,7 @@ func (p *Parser) term() (expr.Expr, error) {
 			return nil, err
 		}
 
-		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+		exp = &expression.Binary{Left: exp, Operator: operator, Right: right}
 
 		// Update isTermOp
 		isTermOp, err = p.match(token.MINUS, token.PLUS)
@@ -139,7 +335,7 @@ func (p *Parser) term() (expr.Expr, error) {
 	return exp, nil
 }
 
-func (p *Parser) factor() (expr.Expr, error) {
+func (p *Parser) factor() (expression.Expr, error) {
 	exp, err := p.unary()
 	if err != nil {
 		return nil, err
@@ -162,7 +358,7 @@ func (p *Parser) factor() (expr.Expr, error) {
 			return nil, err
 		}
 
-		exp = &expr.Binary{Left: exp, Operator: operator, Right: right}
+		exp = &expression.Binary{Left: exp, Operator: operator, Right: right}
 
 		// Update isFactorOp
 		isFactorOp, err = p.match(token.SLASH, token.STAR)
@@ -174,7 +370,7 @@ func (p *Parser) factor() (expr.Expr, error) {
 	return exp, nil
 }
 
-func (p *Parser) unary() (expr.Expr, error) {
+func (p *Parser) unary() (expression.Expr, error) {
 	// Check for NOT or MINUS tokens
 	isUnary, err := p.match(token.NOT, token.MINUS)
 	if err != nil {
@@ -192,20 +388,20 @@ func (p *Parser) unary() (expr.Expr, error) {
 			return nil, err
 		}
 
-		return &expr.Unary{Operator: operator, Right: right}, nil
+		return &expression.Unary{Operator: operator, Right: right}, nil
 	}
 
 	return p.primary()
 }
 
-func (p *Parser) primary() (expr.Expr, error) {
+func (p *Parser) primary() (expression.Expr, error) {
 	// Check for FALSE token
 	isFalse, err := p.match(token.FALSE)
 	if err != nil {
 		return nil, err
 	}
 	if isFalse {
-		return &expr.Literal{Value: func() *literal.BoolLiteral {
+		return &expression.Literal{Value: func() *literal.BoolLiteral {
 			lit := &literal.BoolLiteral{}
 			lit.SetVal(false)
 			return lit
@@ -218,7 +414,7 @@ func (p *Parser) primary() (expr.Expr, error) {
 		return nil, err
 	}
 	if isTrue {
-		return &expr.Literal{Value: func() *literal.BoolLiteral {
+		return &expression.Literal{Value: func() *literal.BoolLiteral {
 			lit := &literal.BoolLiteral{}
 			lit.SetVal(true)
 			return lit
@@ -231,7 +427,7 @@ func (p *Parser) primary() (expr.Expr, error) {
 		return nil, err
 	}
 	if isNull {
-		return &expr.Literal{Value: &literal.NullLiteral{}}, nil
+		return &expression.Literal{Value: &literal.NullLiteral{}}, nil
 	}
 
 	// Check for NUMERIC or STRING tokens
@@ -244,7 +440,22 @@ func (p *Parser) primary() (expr.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &expr.Literal{Value: prev.Literal}, nil
+		return &expression.Literal{Value: prev.Literal}, nil
+	}
+
+	// Check for variables
+	isIdentifier, err := p.match(token.IDENTIFIER)
+	if err != nil {
+		return nil, err
+	}
+	if isIdentifier {
+		prev, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
+		// Return variable expression from identifier token
+		return &expression.Variable{Name: prev}, nil
 	}
 
 	// Check for LEFT_PAREN token
@@ -264,7 +475,7 @@ func (p *Parser) primary() (expr.Expr, error) {
 			return nil, err
 		}
 
-		return &expr.Grouping{Expression: exp}, nil
+		return &expression.Grouping{Expression: exp}, nil
 	}
 
 	// Throws an error on the current token
@@ -357,7 +568,7 @@ func (p *Parser) advance() (token.Token, error) {
 	// until it reaches EOF token in which
 	// the curr ptr will stop moving at that point
 	if !atEnd {
-		p.curr++
+		p.Curr++
 	}
 
 	prev, err := p.previous()
@@ -380,30 +591,30 @@ func (p *Parser) isAtEnd() (bool, error) {
 func (p *Parser) peek() (token.Token, error) {
 	if !p.isCurrInBounds() {
 		return token.Token{}, &exu_err.ParseError{
-			Curr:    p.curr,
+			Curr:    p.Curr,
 			Message: "Index out of bounds",
 		}
 	}
-	return p.tokens[p.curr], nil
+	return p.Tokens[p.Curr], nil
 }
 
 // Gets previous token
 func (p *Parser) previous() (token.Token, error) {
 	// We shift the bounds one unit to the right
 	// since we are accessing the previous token
-	if p.curr < 1 || p.curr >= len(p.tokens)+1 {
+	if p.Curr < 1 || p.Curr >= len(p.Tokens)+1 {
 		return token.Token{}, &exu_err.ParseError{
-			Curr:    p.curr - 1,
+			Curr:    p.Curr - 1,
 			Message: "Index out of bounds",
 		}
 	}
-	return p.tokens[p.curr-1], nil
+	return p.Tokens[p.Curr-1], nil
 }
 
-// Resets expression stack trace whenever keywords are encountered
+// Exits expression tree and proceed to next statement labelled by a keyword
 func (p *Parser) synchronize() error {
 	keywords := []token.TokenType{
-		token.CLASS, token.FN, token.VAR, token.FOR, token.IF,
+		token.CLASS, token.FN, token.LET, token.FOR, token.IF,
 		token.WHILE, token.PRINT, token.RETURN,
 	}
 
@@ -454,7 +665,7 @@ func (p *Parser) synchronize() error {
 // Utility function to check if curr is a
 // valid index in tokens
 func (p *Parser) isCurrInBounds() bool {
-	if p.curr < 0 || p.curr >= len(p.tokens) {
+	if p.Curr < 0 || p.Curr >= len(p.Tokens) {
 		return false
 	}
 	return true

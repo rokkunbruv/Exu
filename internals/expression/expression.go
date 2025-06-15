@@ -1,8 +1,8 @@
-// AST NODES
-// The grammar of Exu statements are defined in grammar.md
+// AST EXPRESSION NODES
+// The grammar of Exu expressions are defined in grammar.md
 // The node definitions utilizes the visitor pattern following Lox's AST nodes
 
-package expr
+package expression
 
 import (
 	literal "github.com/rokkunbruv/internals/literal"
@@ -14,6 +14,8 @@ type Visitor interface {
 	VisitGroupingExpr(*Grouping) (any, error)
 	VisitLiteralExpr(*Literal) (any, error)
 	VisitUnaryExpr(*Unary) (any, error)
+	VisitVariableExpr(*Variable) (any, error)
+	VisitAssignmentExpr(*Assignment) (any, error)
 }
 
 type Expr interface {
@@ -53,4 +55,21 @@ type Unary struct {
 
 func (u *Unary) Accept(visitor Visitor) (any, error) {
 	return visitor.VisitUnaryExpr(u)
+}
+
+type Variable struct {
+	Name token.Token
+}
+
+func (v *Variable) Accept(visitor Visitor) (any, error) {
+	return visitor.VisitVariableExpr(v)
+}
+
+type Assignment struct {
+	Name  token.Token
+	Value Expr
+}
+
+func (a *Assignment) Accept(visitor Visitor) (any, error) {
+	return visitor.VisitAssignmentExpr(a)
 }

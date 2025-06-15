@@ -67,14 +67,15 @@ func run(line string) {
 	}
 
 	// Parse tokens to an AST
-	exp, err := parser.Parse(tokens)
+	p := parser.Parser{Tokens: tokens, Curr: 0}
+	statements, err := p.Parse()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	// Evaluate AST
-	intr := interpreter.Interpreter{Expression: exp}
+	intr := interpreter.Interpreter{Statements: statements}
 	err = intr.Interpret()
 	if err != nil {
 		fmt.Println(err)

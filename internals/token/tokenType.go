@@ -47,7 +47,7 @@ const (
 	CLASS  TokenType = "CLASS"
 	SUPER  TokenType = "SUPER"
 	SELF   TokenType = "SELF"
-	VAR    TokenType = "VAR"
+	LET    TokenType = "LET"
 
 	EOF TokenType = "EOF"
 )

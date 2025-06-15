@@ -2,30 +2,48 @@ package interpreter
 
 import (
 	"fmt"
+	"io"
+	"os"
 
+	"github.com/rokkunbruv/internals/environment"
 	exu_err "github.com/rokkunbruv/internals/err"
-	"github.com/rokkunbruv/internals/expr"
+	"github.com/rokkunbruv/internals/expression"
 	"github.com/rokkunbruv/internals/literal"
+	"github.com/rokkunbruv/internals/statement"
 	"github.com/rokkunbruv/internals/token"
 )
 
+var out io.Writer = os.Stdout
+
 type Interpreter struct {
-	Expression expr.Expr
+	Statements []statement.Stmt        // List of statements from source code
+	env        environment.Environment // Environment the interpreter is currently in
 }
 
+// Executes the parsed AST
 func (i *Interpreter) Interpret() error {
-	val, err := i.evaluate(i.Expression)
-	if err != nil {
-		return err
+	i.env = environment.GenerateEnvironment(nil)
+
+	for _, statement := range i.Statements {
+		err := i.execute(statement)
+		if err != nil {
+			return err
+		}
 	}
-
-	// Print the value of the evaluated expression
-	fmt.Println(val.ToString())
-
 	return nil
 }
 
-func (i *Interpreter) evaluate(exp expr.Expr) (literal.Literal, error) {
+// Executes a statement
+func (i *Interpreter) execute(stmt statement.Stmt) error {
+	err := stmt.Accept(i)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Evaluates an expression
+func (i *Interpreter) evaluate(exp expression.Expr) (literal.Literal, error) {
 	litObj, err := exp.Accept(i)
 	if err != nil {
 		return nil, err
@@ -33,17 +51,109 @@ func (i *Interpreter) evaluate(exp expr.Expr) (literal.Literal, error) {
 
 	lit, ok := litObj.(literal.Literal)
 	if !ok {
-		return nil, &exu_err.CastError{Message: "Evaluated result of expression does not result to a literal"}
+		return nil, &exu_err.CastError{Message: "Evaluated result of expression does not result to a literal."}
 	}
 
 	return lit, err
 }
 
-func (i *Interpreter) VisitLiteralExpr(exp *expr.Literal) (any, error) {
+func (i *Interpreter) VisitBlockStmt(stmt *statement.Block) error {
+	// Copy the current env to a completely new outerEnv detached from the current
+	// env's reference to save the states of the current env and its enclosings
+	// This is to preserve the states defined in outerEnv prior to applying any
+	// new state changes from the innermost scope
+
+	// { outerEnv's scope
+	// 	states defined here are preserved by outerEnv
+	// 	{ current i.env's scope
+	// 		any states added or changed here will not affect outerEnv
+	// 	}
+	// }
+	outerEnv := environment.CopyEnvironment(i.env)
+
+	// Shallow copy current environment to avoid recursive references
+	enclosing := i.env
+	i.env = environment.GenerateEnvironment(&enclosing)
+
+	// Execute statements inside the block
+	for _, statement := range stmt.Statements {
+		err := i.execute(statement)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Return the scope back to the outer scope
+	i.env = outerEnv
+
+	return nil
+}
+
+func (i *Interpreter) VisitExpressionStmt(stmt *statement.Expression) error {
+	_, err := i.evaluate(stmt.Expression)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *Interpreter) VisitPrintStmt(stmt *statement.Print) error {
+	val, err := i.evaluate(stmt.Expression)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(out, val.ToString())
+
+	return nil
+}
+
+func (i *Interpreter) VisitLetStmt(stmt *statement.Let) error {
+	var value literal.Literal
+
+	// If a variable is initialized to a value, set the value of the variable
+	// to be that value, otherwise set it to null
+	if stmt.Initializer != nil {
+		// Explicitly declare err to avoid redeclaring value
+		var err error
+
+		value, err = i.evaluate(stmt.Initializer)
+		if err != nil {
+			return err
+		}
+	} else {
+		value = &literal.NullLiteral{}
+	}
+
+	// Initialize variable
+	i.env.Define(stmt.Name.Lexeme, value)
+
+	return nil
+}
+
+func (i *Interpreter) VisitAssignmentExpr(exp *expression.Assignment) (any, error) {
+	value, err := i.evaluate(exp.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	err = i.env.Assign(exp.Name, value)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
+func (i *Interpreter) VisitVariableExpr(exp *expression.Variable) (any, error) {
+	return i.env.Get(exp.Name)
+}
+
+func (i *Interpreter) VisitLiteralExpr(exp *expression.Literal) (any, error) {
 	return exp.Value, nil
 }
 
-func (i *Interpreter) VisitGroupingExpr(exp *expr.Grouping) (any, error) {
+func (i *Interpreter) VisitGroupingExpr(exp *expression.Grouping) (any, error) {
 	val, err := i.evaluate(exp.Expression)
 	if err != nil {
 		return nil, err
@@ -52,7 +162,7 @@ func (i *Interpreter) VisitGroupingExpr(exp *expr.Grouping) (any, error) {
 	return val, nil
 }
 
-func (i *Interpreter) VisitUnaryExpr(exp *expr.Unary) (any, error) {
+func (i *Interpreter) VisitUnaryExpr(exp *expression.Unary) (any, error) {
 	val, err := i.evaluate(exp.Right)
 	if err != nil {
 		return nil, err
@@ -92,7 +202,7 @@ func (i *Interpreter) VisitUnaryExpr(exp *expr.Unary) (any, error) {
 	return nil, nil
 }
 
-func (i *Interpreter) VisitBinaryExpr(exp *expr.Binary) (any, error) {
+func (i *Interpreter) VisitBinaryExpr(exp *expression.Binary) (any, error) {
 	left, err := i.evaluate(exp.Left)
 	if err != nil {
 		return nil, err

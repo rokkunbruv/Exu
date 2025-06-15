@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rokkunbruv/internals/expr"
+	"github.com/rokkunbruv/internals/expression"
 )
 
 type AstString struct {
-	indent string    // Sets the indentation string as the visitor traverses to the AST
-	Expr   expr.Expr // The expression tree to be converted to a string
+	indent string          // Sets the indentation string as the visitor traverses to the AST
+	Expr   expression.Expr // The expression tree to be converted to a string
 }
 
 func (a *AstString) Generate() (string, error) {
@@ -27,23 +27,31 @@ func (a *AstString) Generate() (string, error) {
 	return str, nil
 }
 
-func (a *AstString) VisitBinaryExpr(expr *expr.Binary) (any, error) {
+func (a *AstString) VisitAssignmentExpr(expr *expression.Assignment) (any, error) {
+	return generateSubTree(a, ":", &expression.Variable{Name: expr.Name}, expr.Value)
+}
+
+func (a *AstString) VisitVariableExpr(expr *expression.Variable) (any, error) {
+	return expr.Name.Lexeme, nil
+}
+
+func (a *AstString) VisitBinaryExpr(expr *expression.Binary) (any, error) {
 	return generateSubTree(a, expr.Operator.Lexeme, expr.Left, expr.Right)
 }
 
-func (a *AstString) VisitGroupingExpr(expr *expr.Grouping) (any, error) {
+func (a *AstString) VisitGroupingExpr(expr *expression.Grouping) (any, error) {
 	return generateSubTree(a, "()", expr.Expression)
 }
 
-func (a *AstString) VisitLiteralExpr(expr *expr.Literal) (any, error) {
+func (a *AstString) VisitLiteralExpr(expr *expression.Literal) (any, error) {
 	return expr.Value.ToString(), nil
 }
 
-func (a *AstString) VisitUnaryExpr(expr *expr.Unary) (any, error) {
+func (a *AstString) VisitUnaryExpr(expr *expression.Unary) (any, error) {
 	return generateSubTree(a, expr.Operator.Lexeme, expr.Right)
 }
 
-func generateSubTree(a *AstString, parentStr string, exprs ...expr.Expr) (string, error) {
+func generateSubTree(a *AstString, parentStr string, exprs ...expression.Expr) (string, error) {
 	var buf string
 
 	for i, exp := range exprs {
