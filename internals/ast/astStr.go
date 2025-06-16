@@ -27,6 +27,10 @@ func (a *AstString) Generate() (string, error) {
 	return str, nil
 }
 
+func (a *AstString) VisitLogicalExpr(expr *expression.Logical) (any, error) {
+	return generateSubTree(a, expr.Operator.Lexeme, expr.Left, expr.Right)
+}
+
 func (a *AstString) VisitAssignmentExpr(expr *expression.Assignment) (any, error) {
 	return generateSubTree(a, ":", &expression.Variable{Name: expr.Name}, expr.Value)
 }
