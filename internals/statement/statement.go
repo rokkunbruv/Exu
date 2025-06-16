@@ -14,6 +14,8 @@ type Visitor interface {
 	VisitPrintStmt(*Print) error
 	VisitLetStmt(*Let) error
 	VisitBlockStmt(*Block) error
+	VisitIfStmt(*If) error
+	VisitWhileStmt(*While) error
 }
 
 type Stmt interface {
@@ -51,4 +53,23 @@ type Block struct {
 
 func (b *Block) Accept(visitor Visitor) error {
 	return visitor.VisitBlockStmt(b)
+}
+
+type If struct {
+	Condition  expression.Expr
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+func (i *If) Accept(visitor Visitor) error {
+	return visitor.VisitIfStmt(i)
+}
+
+type While struct {
+	Condition expression.Expr
+	Body      Stmt
+}
+
+func (w *While) Accept(visitor Visitor) error {
+	return visitor.VisitWhileStmt(w)
 }

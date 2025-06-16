@@ -10,12 +10,17 @@ Full Exu Grammar Productions Definition
 program     -> declaration* EOF
 declaration -> varDecl | statement
 varDecl     -> "let" IDENTIFIER (":" expression)? ";"
-statement   -> exprStmt | printStmt | block
+statement   -> exprStmt | printStmt | ifStmt | whileStmt | forStmt | block
 exprStmt    -> expression ";"
 printStmt   -> "print" expression ";"
+whileStmt   -> "while" "(" expression ")" statement
+forStmt     -> "for" "(" (varDecl | exprStmt | ";") expression? ";" expression? ")" statement
+ifStmt      -> "if" "(" expression ")" statement ("else" statement)?
 block       -> "{" declaration* "}"
 expression  -> assignment
-assignment  -> IDENTIFIER ":" equality | equality
+assignment  -> IDENTIFIER ":" logic_or | logic_or
+logic_or    -> logic_and ("or" logic_and)*
+logic_and   -> equality ("and" equality)*
 equality    -> comparison (( "!=" | "=" ) comparison)*
 comparison  -> term (( ">" | ">=" | "<" | "<=" ) term)*
 term        -> factor (( "+" | "-" ) factor)*

@@ -32,7 +32,7 @@ func Lexer(source string) ([]token.Token, error) {
 	}
 
 	// Pointers for iterating over the source code
-	start, curr, line := 0, 0, 0
+	start, curr, line := 0, 0, 1
 
 	// Scan tokens
 	for curr <= len(source) {

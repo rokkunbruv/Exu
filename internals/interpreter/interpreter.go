@@ -51,25 +51,92 @@ func (i *Interpreter) evaluate(exp expression.Expr) (literal.Literal, error) {
 
 	lit, ok := litObj.(literal.Literal)
 	if !ok {
-		return nil, &exu_err.CastError{Message: "Evaluated result of expression does not result to a literal."}
+		return nil, &exu_err.CastError{Message: "Evaluated result of if condition does not result to a literal."}
 	}
 
 	return lit, err
 }
 
-func (i *Interpreter) VisitBlockStmt(stmt *statement.Block) error {
-	// Copy the current env to a completely new outerEnv detached from the current
-	// env's reference to save the states of the current env and its enclosings
-	// This is to preserve the states defined in outerEnv prior to applying any
-	// new state changes from the innermost scope
+func (i *Interpreter) VisitWhileStmt(stmt *statement.While) error {
+	result, err := i.evaluate(stmt.Condition)
+	if err != nil {
+		return err
+	}
 
-	// { outerEnv's scope
-	// 	states defined here are preserved by outerEnv
-	// 	{ current i.env's scope
-	// 		any states added or changed here will not affect outerEnv
-	// 	}
-	// }
-	outerEnv := environment.CopyEnvironment(i.env)
+	boolLit, ok := result.(*literal.BoolLiteral)
+	if !ok {
+		return &exu_err.RuntimeError{
+			Token:   token.Token{},
+			Message: "Condition of while loop does not evaluate to a bool",
+		}
+	}
+
+	isTrue, err := boolLit.Val()
+	if err != nil {
+		return err
+	}
+
+	for isTrue {
+		err := i.execute(stmt.Body)
+		if err != nil {
+			return err
+		}
+
+		// Check condition after iteration to update isTrue
+		result, err = i.evaluate(stmt.Condition)
+		if err != nil {
+			return err
+		}
+
+		boolLit, ok = result.(*literal.BoolLiteral)
+		if !ok {
+			return &exu_err.RuntimeError{
+				Token:   token.Token{},
+				Message: "Condition of while loop does not evaluate to a bool",
+			}
+		}
+
+		isTrue, err = boolLit.Val()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (i *Interpreter) VisitIfStmt(stmt *statement.If) error {
+	// Evaluates condition expression
+	result, err := i.evaluate(stmt.Condition)
+	if err != nil {
+		return err
+	}
+
+	// Checks if the evaluated condition results to a boolean
+	boolLit, ok := result.(*literal.BoolLiteral)
+	if !ok {
+		return &exu_err.RuntimeError{
+			Token:   token.Token{},
+			Message: "Condition of if statement does not evaluate to a bool",
+		}
+	}
+
+	// Performs if statement logic
+	if isTrue, err := boolLit.Val(); err != nil {
+		return err
+	} else if isTrue {
+		return i.execute(stmt.ThenBranch)
+	} else if stmt.ElseBranch != nil {
+		return i.execute(stmt.ElseBranch)
+	}
+
+	return nil
+}
+
+func (i *Interpreter) VisitBlockStmt(stmt *statement.Block) error {
+	// Get a reference of current env (outer scope) so the interpreter
+	// can refer back to this once we exit the block
+	outerEnv := i.env
 
 	// Shallow copy current environment to avoid recursive references
 	enclosing := i.env
@@ -129,6 +196,50 @@ func (i *Interpreter) VisitLetStmt(stmt *statement.Let) error {
 	i.env.Define(stmt.Name.Lexeme, value)
 
 	return nil
+}
+
+// This implementation iteratively checks each expression, ending the chain
+// if the value of the evaluated expression is the evaluated result of the
+// entire expression (for &, this expression must evaluate to false and for
+// |, this expression must evalaute to true)
+func (i *Interpreter) VisitLogicalExpr(exp *expression.Logical) (any, error) {
+	// Evaluate leftmost expression
+	left, err := i.evaluate(exp.Left)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if evaluated expression results to a boolean
+	isBool, ok := left.(*literal.BoolLiteral)
+	if !ok {
+		return nil, &exu_err.RuntimeError{
+			Token:   exp.Operator,
+			Message: fmt.Sprintf("Expression before %v does not evaluate to a bool", exp.Operator.Lexeme),
+		}
+	}
+
+	// Get value of boolean
+	isTrue, err := isBool.Val()
+	if err != nil {
+		return nil, err
+	}
+
+	// If leftmost expression is true in an or expression,
+	// evaluates the entire expression to true
+	// If leftmost expression is false in an and expression,
+	// evaluates the entire expression to false
+	if exp.Operator.TokenType == token.OR {
+		if isTrue {
+			return literal.GenerateBoolLiteral(true), nil
+		}
+	} else if exp.Operator.TokenType == token.AND {
+		if !isTrue {
+			return literal.GenerateBoolLiteral(false), nil
+		}
+	}
+
+	// Check the next (right) expression to evaluate from
+	return i.evaluate(exp.Right)
 }
 
 func (i *Interpreter) VisitAssignmentExpr(exp *expression.Assignment) (any, error) {

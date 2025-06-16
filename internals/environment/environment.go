@@ -5,8 +5,6 @@ package environment
 import (
 	"fmt"
 
-	"maps"
-
 	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/literal"
 	"github.com/rokkunbruv/internals/token"
@@ -25,25 +23,6 @@ func GenerateEnvironment(enclosing *Environment) Environment {
 	}
 
 	return env
-}
-
-// Performs manual deep copy of an environment
-func CopyEnvironment(env Environment) Environment {
-	// Deep copy values
-	newValues := map[string]literal.Literal{}
-	maps.Copy(newValues, env.values)
-
-	// Deep copy enclosing
-	newEnclosing := Environment{}
-
-	if env.enclosing != nil {
-		newEnclosing = CopyEnvironment(*env.enclosing)
-	}
-
-	return Environment{
-		values:    newValues,
-		enclosing: &newEnclosing,
-	}
 }
 
 // Add a new state

@@ -98,6 +98,20 @@ func (p *Parser) varDeclaration() (statement.Stmt, error) {
 }
 
 func (p *Parser) statement() (statement.Stmt, error) {
+	// Check for if keyword
+	if isIf, err := p.match(token.IF); isIf {
+		return p.ifStatement()
+	} else if err != nil {
+		return nil, err
+	}
+
+	// Check for for keyword
+	if isFor, err := p.match(token.FOR); isFor {
+		return p.forStatement()
+	} else if err != nil {
+		return nil, err
+	}
+
 	// Check for print keyword
 	isPrint, err := p.match(token.PRINT)
 	if err != nil {
@@ -106,6 +120,16 @@ func (p *Parser) statement() (statement.Stmt, error) {
 
 	if isPrint {
 		return p.printStatement()
+	}
+
+	// Check for while keyword
+	isWhile, err := p.match(token.WHILE)
+	if err != nil {
+		return nil, err
+	}
+
+	if isWhile {
+		return p.whileStatement()
 	}
 
 	// Check for blocks
@@ -124,6 +148,164 @@ func (p *Parser) statement() (statement.Stmt, error) {
 	}
 
 	return p.exprStatement()
+}
+
+func (p *Parser) forStatement() (statement.Stmt, error) {
+	if _, err := p.consume(token.LEFT_PAREN, "Expected \"(\" after \"for\""); err != nil {
+		return nil, err
+	}
+
+	// Check initializer
+	var initializer statement.Stmt
+	if isSemicolon, err := p.match(token.SEMICOLON); err != nil {
+		return nil, err
+	} else if isSemicolon {
+		initializer = nil
+	} else if isLet, err := p.match(token.LET); err != nil {
+		return nil, err
+	} else if isLet {
+		initializer, err = p.varDeclaration()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		initializer, err = p.exprStatement()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Check condition initializer
+	var condition expression.Expr
+	if isSemicolon, err := p.check(token.SEMICOLON); err != nil {
+		return nil, err
+	} else if !isSemicolon {
+		condition, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		condition = nil
+	}
+
+	if _, err := p.consume(token.SEMICOLON, "Expected \";\" after condition of for loop"); err != nil {
+		return nil, err
+	}
+
+	// Check iterator initializer
+	var iterator expression.Expr
+	if isRightParen, err := p.check(token.RIGHT_PAREN); err != nil {
+		return nil, err
+	} else if !isRightParen {
+		iterator, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		iterator = nil
+	}
+
+	if _, err := p.consume(token.RIGHT_PAREN, "Expected \")\" after for loop clause"); err != nil {
+		return nil, err
+	}
+
+	// Check body
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert for loop statement to its equivalent while loop
+	if iterator != nil {
+		body = &statement.Block{
+			Statements: []statement.Stmt{
+				body,
+				&statement.Expression{
+					Expression: iterator,
+				},
+			},
+		}
+	}
+
+	if condition == nil {
+		condition = &expression.Literal{
+			Value: literal.GenerateBoolLiteral(true),
+		}
+	}
+	body = &statement.While{
+		Condition: condition,
+		Body:      body,
+	}
+
+	if initializer != nil {
+		body = &statement.Block{
+			Statements: []statement.Stmt{
+				initializer,
+				body,
+			},
+		}
+	}
+
+	return body, nil
+}
+
+func (p *Parser) whileStatement() (statement.Stmt, error) {
+	// Check while condition expression
+	if _, err := p.consume(token.LEFT_PAREN, "Expected \"(\" after \"while\""); err != nil {
+		return nil, err
+	}
+	condition, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(token.RIGHT_PAREN, "Expected \")\" after while condition"); err != nil {
+		return nil, err
+	}
+
+	// Check while loop body
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.While{Condition: condition, Body: body}, nil
+}
+
+func (p *Parser) ifStatement() (statement.Stmt, error) {
+	// Check if condition expression
+	if _, err := p.consume(token.LEFT_PAREN, "Expected \"(\" after \"if\""); err != nil {
+		return nil, err
+	}
+	condition, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.consume(token.RIGHT_PAREN, "Expected \")\" after if condition"); err != nil {
+		return nil, err
+	}
+
+	// Check for then branch statement
+	thenBranch, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for else branch statement
+	var elseBranch statement.Stmt
+	if isElse, err := p.match(token.ELSE); isElse {
+		elseBranch, err = p.statement()
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &statement.If{
+		Condition:  condition,
+		ThenBranch: thenBranch,
+		ElseBranch: elseBranch,
+	}, nil
 }
 
 func (p *Parser) block() ([]statement.Stmt, error) {
@@ -189,7 +371,11 @@ func (p *Parser) exprStatement() (statement.Stmt, error) {
 }
 
 func (p *Parser) expression() (expression.Expr, error) {
-	expr, err := p.equality()
+	return p.assignment()
+}
+
+func (p *Parser) assignment() (expression.Expr, error) {
+	expr, err := p.or()
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +411,85 @@ func (p *Parser) expression() (expression.Expr, error) {
 			Name:  variable.Name,
 			Value: value,
 		}, nil
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) or() (expression.Expr, error) {
+	expr, err := p.and()
+	if err != nil {
+		return nil, err
+	}
+
+	isOr, err := p.match(token.OR)
+	if err != nil {
+		return nil, err
+	}
+
+	for isOr {
+		if err != nil {
+			return nil, err
+		}
+
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
+		right, err := p.and()
+		if err != nil {
+			return nil, err
+		}
+
+		expr = &expression.Logical{
+			Left:     expr,
+			Operator: operator,
+			Right:    right,
+		}
+
+		isOr, err = p.match(token.OR)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) and() (expression.Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	isAnd, err := p.match(token.AND)
+	if err != nil {
+		return nil, err
+	}
+
+	for isAnd {
+		operator, err := p.previous()
+		if err != nil {
+			return nil, err
+		}
+
+		right, err := p.equality()
+		if err != nil {
+			return nil, err
+		}
+
+		expr = &expression.Logical{
+			Left:     expr,
+			Operator: operator,
+			Right:    right,
+		}
+
+		// Update isAnd
+		isAnd, err = p.match(token.AND)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return expr, nil

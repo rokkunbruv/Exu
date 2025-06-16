@@ -16,6 +16,7 @@ type Visitor interface {
 	VisitUnaryExpr(*Unary) (any, error)
 	VisitVariableExpr(*Variable) (any, error)
 	VisitAssignmentExpr(*Assignment) (any, error)
+	VisitLogicalExpr(*Logical) (any, error)
 }
 
 type Expr interface {
@@ -72,4 +73,14 @@ type Assignment struct {
 
 func (a *Assignment) Accept(visitor Visitor) (any, error) {
 	return visitor.VisitAssignmentExpr(a)
+}
+
+type Logical struct {
+	Left     Expr
+	Operator token.Token
+	Right    Expr
+}
+
+func (l *Logical) Accept(visitor Visitor) (any, error) {
+	return visitor.VisitLogicalExpr(l)
 }

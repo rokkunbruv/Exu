@@ -23,6 +23,159 @@ func TestEvaluate(t *testing.T) {
 
 	tests := []testCase{
 		{
+			name: "test and resulting to true",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(true),
+		},
+		{
+			name: "test and w/ false 1st expr",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(false),
+		},
+		{
+			name: "test and w/ false 2nd expr",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(false),
+		},
+		{
+			name: "test or resulting to false",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+						Operator: token.Token{TokenType: token.OR, Lexeme: "|"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(false),
+		},
+		{
+			name: "test and w/ true 1st expr",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+						Operator: token.Token{TokenType: token.OR, Lexeme: "|"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(true),
+		},
+		{
+			name: "test and w/ true 2nd expr",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+						Operator: token.Token{TokenType: token.OR, Lexeme: "|"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(true),
+		},
+		{
+			name: "test chained logical expr",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left: &expression.Logical{
+							Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+							Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+							Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+						},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(false),
+		},
+		{
+			name: "test logical operator precedence",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left: &expression.Logical{
+							Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+							Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+							Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+						},
+						Operator: token.Token{TokenType: token.OR, Lexeme: "|"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(true),
+		},
+		{
+			name: "test logical expression w/ expression that evaluates to bool",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left: &expression.Binary{
+							Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+							Operator: token.Token{TokenType: token.GREATER, Lexeme: ">"},
+							Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+						},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			expected: literal.GenerateBoolLiteral(false),
+		},
+		{
+			name: "test logical expression w/ expression that evaluates to non bool",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Message: "Expression before & does not evaluate to a bool",
+			},
+		},
+		{
+			name: "test logical expression w/ invalid expression",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{&statement.Expression{
+					Expression: &expression.Logical{
+						Left: &expression.Unary{
+							Operator: token.Token{TokenType: token.NOT, Lexeme: "!"},
+							Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+						},
+						Operator: token.Token{TokenType: token.AND, Lexeme: "&"},
+						Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+					}}},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 0},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
 			name: "unary not on bool",
 			interpreter: Interpreter{
 				Statements: []statement.Stmt{&statement.Expression{

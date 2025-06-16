@@ -27,36 +27,36 @@ func TestLexer(t *testing.T) {
 			name:   "test all keywords, operators, and separators in one line",
 			source: "fn test() { if true && false | null while for else class super self return print }",
 			expected: []token.Token{
-				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 0},
-				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 0},
-				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 0},
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 0},
-				{TokenType: token.IF, Lexeme: "if", Literal: nil, Line: 0},
+				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 1},
+				{TokenType: token.IF, Lexeme: "if", Literal: nil, Line: 1},
 				{TokenType: token.TRUE, Lexeme: "true", Literal: func() *literal.BoolLiteral {
 					lit := &literal.BoolLiteral{}
 					lit.SetVal(true)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 0},
-				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Literal: nil, Line: 1},
 				{TokenType: token.FALSE, Lexeme: "false", Literal: func() *literal.BoolLiteral {
 					lit := &literal.BoolLiteral{}
 					lit.SetVal(false)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.OR, Lexeme: "|", Literal: nil, Line: 0},
-				{TokenType: token.NULL, Lexeme: "null", Literal: nil, Line: 0},
-				{TokenType: token.WHILE, Lexeme: "while", Literal: nil, Line: 0},
-				{TokenType: token.FOR, Lexeme: "for", Literal: nil, Line: 0},
-				{TokenType: token.ELSE, Lexeme: "else", Literal: nil, Line: 0},
-				{TokenType: token.CLASS, Lexeme: "class", Literal: nil, Line: 0},
-				{TokenType: token.SUPER, Lexeme: "super", Literal: nil, Line: 0},
-				{TokenType: token.SELF, Lexeme: "self", Literal: nil, Line: 0},
-				{TokenType: token.RETURN, Lexeme: "return", Literal: nil, Line: 0},
-				{TokenType: token.PRINT, Lexeme: "print", Literal: nil, Line: 0},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Literal: nil, Line: 1},
+				{TokenType: token.NULL, Lexeme: "null", Literal: nil, Line: 1},
+				{TokenType: token.WHILE, Lexeme: "while", Literal: nil, Line: 1},
+				{TokenType: token.FOR, Lexeme: "for", Literal: nil, Line: 1},
+				{TokenType: token.ELSE, Lexeme: "else", Literal: nil, Line: 1},
+				{TokenType: token.CLASS, Lexeme: "class", Literal: nil, Line: 1},
+				{TokenType: token.SUPER, Lexeme: "super", Literal: nil, Line: 1},
+				{TokenType: token.SELF, Lexeme: "self", Literal: nil, Line: 1},
+				{TokenType: token.RETURN, Lexeme: "return", Literal: nil, Line: 1},
+				{TokenType: token.PRINT, Lexeme: "print", Literal: nil, Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			},
 		},
 		{
@@ -67,111 +67,111 @@ func TestLexer(t *testing.T) {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(1)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 0},
-				{TokenType: token.MINUS, Lexeme: "-", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Literal: nil, Line: 1},
+				{TokenType: token.MINUS, Lexeme: "-", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "2.34", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(2.34)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.STAR, Lexeme: "*", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "0.5", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(0.5)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.SLASH, Lexeme: "/", Literal: nil, Line: 0},
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
-				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 0},
-				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
-				{TokenType: token.LEFT_ARROW, Lexeme: "<-", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.SLASH, Lexeme: "/", Literal: nil, Line: 1},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 1},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 1},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 1},
+				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
+				{TokenType: token.LEFT_ARROW, Lexeme: "<-", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "000123.456", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(123.456)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			},
 		},
 		{
 			name:     "test edge cases: unicode, invalid identifiers, string edge cases",
 			source:   "id你好 1var .123 42. whiile \"test\n\" @#$",
 			expected: nil,
-			err:      &exu_err.ScanError{Line: 0, Message: "Unexpected 你 found"},
+			err:      &exu_err.ScanError{Line: 1, Message: "Unexpected 你 found"},
 		},
 		{
 			name:   "test whitespace handling and comment",
 			source: "fn\ttest\n(\n)\t{\n#comment\n}",
 			expected: []token.Token{
-				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 0},
-				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 1},
-				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 2},
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 2},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 4},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
+				{TokenType: token.FN, Lexeme: "fn", Literal: nil, Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "test", Literal: nil, Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Literal: nil, Line: 2},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Literal: nil, Line: 3},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Literal: nil, Line: 3},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Literal: nil, Line: 5},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 5},
 			},
 		},
 		{
 			name:     "test string handling and escapes",
 			source:   "str: \"hello\nworld\" \"unterminated",
 			expected: nil,
-			err:      &exu_err.ScanError{Line: 1, Message: "Unterminated string"},
+			err:      &exu_err.ScanError{Line: 2, Message: "Unterminated string"},
 		},
 		{
 			name:   "test adjacent tokens and special identifiers",
 			source: "x:1,_y:.2,z:",
 			expected: []token.Token{
-				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: nil, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				{TokenType: token.IDENTIFIER, Lexeme: "x", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(1)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "_y", Literal: nil, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
-				{TokenType: token.DOT, Lexeme: ".", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "_y", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
+				{TokenType: token.DOT, Lexeme: ".", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "2", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(2)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "z", Literal: nil, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Literal: nil, Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "z", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			},
 		},
 		{
 			name:     "test unterminated strings and string escapes",
 			source:   "str1: \"hello\nstr2: \"world\n\nstr3: \"incomplete",
 			expected: nil,
-			err:      &exu_err.ScanError{Line: 3, Message: "Unterminated string"},
+			err:      &exu_err.ScanError{Line: 4, Message: "Unterminated string"},
 		},
 		{
 			name:   "test adjacent comparison operators",
 			source: "!=!<==>=><==<>=!==",
 			expected: []token.Token{
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
-				{TokenType: token.NOT, Lexeme: "!", Literal: nil, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
-				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 0},
-				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
-				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 0},
-				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 0},
-				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 0},
-				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 0},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 0},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 1},
+				{TokenType: token.NOT, Lexeme: "!", Literal: nil, Line: 1},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Literal: nil, Line: 1},
+				{TokenType: token.LESS_EQUAL, Lexeme: "<=", Literal: nil, Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				{TokenType: token.LESS, Lexeme: "<", Literal: nil, Line: 1},
+				{TokenType: token.GREATER_EQUAL, Lexeme: ">=", Literal: nil, Line: 1},
+				{TokenType: token.NOT_EQUAL, Lexeme: "!=", Literal: nil, Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Literal: nil, Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 1},
 			},
 		},
 		{
@@ -182,48 +182,48 @@ func TestLexer(t *testing.T) {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(1)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "var_test", Literal: nil, Line: 0},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 0},
+				}(), Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "var_test", Literal: nil, Line: 1},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "42", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(42)
 					return lit
-				}(), Line: 0},
-				{TokenType: token.IDENTIFIER, Lexeme: "_valid_var", Literal: nil, Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 1},
+				}(), Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "_valid_var", Literal: nil, Line: 2},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 2},
 				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: func() *literal.StringLiteral {
 					lit := &literal.StringLiteral{}
 					lit.SetVal("str")
 					return lit
-				}(), Line: 1},
+				}(), Line: 2},
 				{TokenType: token.NUMERIC, Lexeme: "123", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(123)
 					return lit
-				}(), Line: 4},
-				{TokenType: token.IDENTIFIER, Lexeme: "_invalid", Literal: nil, Line: 4},
-				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 4},
+				}(), Line: 5},
+				{TokenType: token.IDENTIFIER, Lexeme: "_invalid", Literal: nil, Line: 5},
+				{TokenType: token.COLON, Lexeme: ":", Literal: nil, Line: 5},
 				{TokenType: token.NUMERIC, Lexeme: "30", Literal: func() *literal.NumericLiteral {
 					lit := &literal.NumericLiteral{}
 					lit.SetVal(30)
 					return lit
-				}(), Line: 4},
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
+				}(), Line: 5},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 5},
 			},
 		},
 		{
 			name:   "test comments with various content and empty lines",
 			source: "#comment with numbers 123\n\n#comment with symbols @#$\n#comment with keywords if while\n",
 			expected: []token.Token{
-				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 4},
+				{TokenType: token.EOF, Lexeme: "", Literal: nil, Line: 5},
 			},
 		},
 		{
 			name:     "test mixed string termination and escape sequences",
 			source:   "str1: \"valid\n\" + str2: \"invalid\n\" + str3: \"unterminated",
 			expected: nil,
-			err:      &exu_err.ScanError{Line: 2, Message: "Unterminated string"},
+			err:      &exu_err.ScanError{Line: 3, Message: "Unterminated string"},
 		},
 	}
 

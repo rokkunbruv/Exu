@@ -6,109 +6,158 @@ import (
 	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/expression"
 	"github.com/rokkunbruv/internals/literal"
-	"github.com/rokkunbruv/internals/statement"
 	"github.com/rokkunbruv/internals/token"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestVarDeclaration(t *testing.T) {
+func TestOr(t *testing.T) {
 	type testCase struct {
 		name   string
 		parser Parser
 
-		expected statement.Stmt
+		expected expression.Expr
 		err      error
 	}
 
 	tests := []testCase{
 		{
-			name: "test initialize variable w/ no initializer",
+			name: "test valid or expression between literals",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LET, Lexeme: "let", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: &statement.Let{
-				Name:        token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				Initializer: nil,
+			expected: &expression.Logical{
+				Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				Operator: token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
 			},
 			err: nil,
 		},
 		{
-			name: "test initialize variable w/ literal initializer",
+			name: "test chained or expression",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LET, Lexeme: "let", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.FALSE, Lexeme: "false", Literal: literal.GenerateBoolLiteral(false), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: &statement.Let{
-				Name:        token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				Initializer: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+			expected: &expression.Logical{
+				Left: &expression.Logical{
+					Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					Operator: token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				},
+				Operator: token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
 			},
 			err: nil,
 		},
 		{
-			name: "test initialize variable w/ expression initializer",
+			name: "test valid or expression between expressions",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LET, Lexeme: "let", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "2", Literal: literal.GenerateNumericLiteral(2), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: literal.GenerateStringLiteral("str"), Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: literal.GenerateStringLiteral("str"), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: &statement.Let{
-				Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				Initializer: &expression.Binary{
+			expected: &expression.Logical{
+				Left: &expression.Binary{
 					Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
-					Operator: token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					Operator: token.Token{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+				},
+				Operator: token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+				Right: &expression.Binary{
+					Left:     &expression.Literal{Value: literal.GenerateStringLiteral("str")},
+					Operator: token.Token{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateStringLiteral("str")},
 				},
 			},
 			err: nil,
 		},
 		{
-			name: "test unterminated variable declaration",
+			name: "test no right in or expression",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LET, Lexeme: "let", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected expression but got ",
+			},
+		},
+		{
+			name: "test no left in or expression",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.FALSE, Lexeme: "false", Literal: literal.GenerateBoolLiteral(false), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+				Message: "Expected expression but got |",
+			},
+		},
+		{
+			name: "test invalid expression in or expression",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+				{TokenType: token.OR, Lexeme: "|", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.OR, Lexeme: "|", Line: 1},
+				Message: "Expected expression but got |",
+			},
+		},
+		{
+			name: "test valid and expr",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
 				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: nil,
-			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
-				Message: "Expected \";\" after variable declaration.",
+			expected: &expression.Logical{
+				Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
 			},
+			err: nil,
 		},
 		{
-			name: "test incomplete variable definition",
+			name: "test invalid and expr",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LET, Lexeme: "let", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.COLON, Lexeme: ":", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
 			expected: nil,
 			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				Message: "Expected expression but got ;",
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected expression but got ",
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual, err := test.parser.declaration()
-			if test.err != nil || err != nil {
+			actual, err := test.parser.or()
+			if test.err != nil {
 				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)
@@ -116,332 +165,154 @@ func TestVarDeclaration(t *testing.T) {
 	}
 }
 
-func TestBlock(t *testing.T) {
+func TestAnd(t *testing.T) {
 	type testCase struct {
 		name   string
 		parser Parser
 
-		expected statement.Stmt
-		err      error
-	}
-
-	tests := []testCase{
-		// Add to TestBlock:
-		{
-			name: "test empty block",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: &statement.Block{Statements: []statement.Stmt{}},
-			err:      nil,
-		},
-		{
-			name: "test one-line block",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: &statement.Block{Statements: []statement.Stmt{
-				&statement.Print{
-					Expression: &expression.Variable{
-						Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-					},
-				},
-			}},
-			err: nil,
-		},
-		{
-			name: "test multiple lines block",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				{TokenType: token.PRINT, Lexeme: "print", Line: 2},
-				{TokenType: token.IDENTIFIER, Lexeme: "b", Line: 2},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 2},
-				{TokenType: token.PRINT, Lexeme: "print", Line: 3},
-				{TokenType: token.IDENTIFIER, Lexeme: "c", Line: 3},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 3},
-				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 4},
-				{TokenType: token.EOF, Lexeme: "", Line: 4},
-			}, Curr: 0},
-			expected: &statement.Block{Statements: []statement.Stmt{
-				&statement.Print{
-					Expression: &expression.Variable{
-						Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-					},
-				},
-				&statement.Print{
-					Expression: &expression.Variable{
-						Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "b", Line: 2},
-					},
-				},
-				&statement.Print{
-					Expression: &expression.Variable{
-						Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "c", Line: 3},
-					},
-				},
-			}},
-			err: nil,
-		},
-		{
-			name: "test unterminated block",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: nil,
-			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
-				Message: "Expected \"}\" after block.",
-			},
-		},
-		// FIXME: Add test for missing left braces
-		// {
-		//     name: "test missing left braces",
-		//     parser: Parser{Tokens: []token.Token{
-		//         {TokenType: token.PRINT, Lexeme: "print", Line: 1},
-		//         {TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
-		//         {TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-		//         {TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
-		//         {TokenType: token.EOF, Lexeme: "", Line: 1},
-		//     }, Curr: 0},
-		//     expected: nil,
-		//     err: &exu_err.SyntaxError{
-		//         Token: token.Token{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
-		//         Message: "Unexpected }",
-		//     },
-		// },
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actual, err := test.parser.statement()
-			if test.err != nil || err != nil {
-				assert.EqualError(t, err, test.err.Error())
-			}
-			assert.Equal(t, test.expected, actual)
-		})
-	}
-}
-
-func TestPrintStatement(t *testing.T) {
-	type testCase struct {
-		name   string
-		parser Parser
-
-		expected statement.Stmt
+		expected expression.Expr
 		err      error
 	}
 
 	tests := []testCase{
 		{
-			name: "test valid print statement w/ literal",
+			name: "test valid and expression between literals",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: &statement.Print{
-				Expression: &expression.Literal{Value: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}()},
+			expected: &expression.Logical{
+				Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
 			},
 			err: nil,
 		},
 		{
-			name: "test valid print statement w/ expression",
+			name: "test chained and expression",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.FALSE, Lexeme: "false", Literal: literal.GenerateBoolLiteral(false), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
-			expected: &statement.Print{
-				Expression: &expression.Binary{
-					Left: &expression.Literal{Value: func() *literal.NumericLiteral {
-						lit := &literal.NumericLiteral{}
-						lit.SetVal(1)
-						return lit
-					}()},
-					Operator: token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-					Right: &expression.Literal{Value: func() *literal.NumericLiteral {
-						lit := &literal.NumericLiteral{}
-						lit.SetVal(1)
-						return lit
-					}()},
+			expected: &expression.Logical{
+				Left: &expression.Logical{
+					Left:     &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+					Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				},
+				Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+			},
+			err: nil,
+		},
+		{
+			name: "test valid and expression between expressions",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "2", Literal: literal.GenerateNumericLiteral(2), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: literal.GenerateStringLiteral("str"), Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+				{TokenType: token.STRING, Lexeme: "\"str\"", Literal: literal.GenerateStringLiteral("str"), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Logical{
+				Left: &expression.Binary{
+					Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					Operator: token.Token{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+				},
+				Operator: token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Right: &expression.Binary{
+					Left:     &expression.Literal{Value: literal.GenerateStringLiteral("str")},
+					Operator: token.Token{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateStringLiteral("str")},
 				},
 			},
 			err: nil,
 		},
 		{
-			name: "test unterminated print statement",
+			name: "test no right in and expression",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
 			expected: nil,
 			err: &exu_err.SyntaxError{
 				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
-				Message: "Expected \";\" after expression.",
+				Message: "Expected expression but got ",
 			},
 		},
 		{
-			name: "test invalid expression in print statement",
+			name: "test no left in and expression",
 			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.PRINT, Lexeme: "print", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.FALSE, Lexeme: "false", Literal: literal.GenerateBoolLiteral(false), Line: 1},
 				{TokenType: token.EOF, Lexeme: "", Line: 1},
 			}, Curr: 0},
 			expected: nil,
 			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				Message: "Expected expression but got ;",
+				Token:   token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Message: "Expected expression but got &",
+			},
+		},
+		{
+			name: "test invalid expression in and expression",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.GREATER, Lexeme: ">", Line: 1},
+				{TokenType: token.AND, Lexeme: "&", Line: 1},
+				{TokenType: token.TRUE, Lexeme: "true", Literal: literal.GenerateBoolLiteral(true), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.AND, Lexeme: "&", Line: 1},
+				Message: "Expected expression but got &",
+			},
+		},
+		{
+			name: "test valid equality",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Binary{
+				Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				Operator: token.Token{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+				Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+			},
+			err: nil,
+		},
+		{
+			name: "test invalid equality",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.EQUAL, Lexeme: "=", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected expression but got ",
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Run statement method to include print keyword in parse testing
-			actual, err := test.parser.statement()
-			if test.err != nil || err != nil {
-				// assert.EqualError(t, err, test.err.Error())
-				assert.Equal(t, test.err, err)
-			}
-			assert.Equal(t, test.expected, actual)
-		})
-	}
-}
-
-func TestExprStatement(t *testing.T) {
-	type testCase struct {
-		name   string
-		parser Parser
-
-		expected statement.Stmt
-		err      error
-	}
-
-	tests := []testCase{
-		{
-			name: "test valid expr statement",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: &statement.Expression{
-				Expression: &expression.Binary{
-					Left: &expression.Literal{Value: func() *literal.NumericLiteral {
-						lit := &literal.NumericLiteral{}
-						lit.SetVal(1)
-						return lit
-					}()},
-					Operator: token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-					Right: &expression.Literal{Value: func() *literal.NumericLiteral {
-						lit := &literal.NumericLiteral{}
-						lit.SetVal(1)
-						return lit
-					}()},
-				},
-			},
-			err: nil,
-		},
-		{
-			name: "test unterminated expr statement",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: nil,
-			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
-				Message: "Expected \";\" after expression.",
-			},
-		},
-		{
-			name: "test invalid expression in expr statement",
-			parser: Parser{Tokens: []token.Token{
-				{TokenType: token.NUMERIC, Lexeme: "1", Literal: func() *literal.NumericLiteral {
-					lit := &literal.NumericLiteral{}
-					lit.SetVal(1)
-					return lit
-				}(), Line: 1},
-				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
-				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				{TokenType: token.EOF, Lexeme: "", Line: 1},
-			}, Curr: 0},
-			expected: nil,
-			err: &exu_err.SyntaxError{
-				Token:   token.Token{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
-				Message: "Expected expression but got ;",
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actual, err := test.parser.exprStatement()
-			if test.err != nil || err != nil {
+			actual, err := test.parser.and()
+			if test.err != nil {
 				assert.EqualError(t, err, test.err.Error())
 			}
 			assert.Equal(t, test.expected, actual)

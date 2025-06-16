@@ -1,5 +1,5 @@
 // This test checks for either of the two behaviors: output stream behavior or interpreter state behavior
-// Output stream test checks for command line outputs, used to test print statements and scoping
+// Output stream test checks for command line outputs, used to test print statements, scoping, and control flow
 // Interpreter state test checks for interpreter state, used for test initialization of objects and variables
 
 package interpreter
@@ -216,6 +216,248 @@ func TestExecuteOnOutputStream(t *testing.T) {
 
 	tests := []testCase{
 		{
+			name: "test while loop counting from 1 to 5",
+			interpreter: Interpreter{
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			statement: &statement.While{
+				Condition: &expression.Binary{
+					Left:     &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+					Operator: token.Token{TokenType: token.LESS_EQUAL, Lexeme: "<="},
+					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(5)},
+				},
+				Body: &statement.Block{
+					Statements: []statement.Stmt{
+						&statement.Print{
+							Expression: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+						},
+						&statement.Expression{
+							Expression: &expression.Assignment{
+								Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+								Value: &expression.Binary{
+									Left:     &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+									Operator: token.Token{TokenType: token.PLUS, Lexeme: "+"},
+									Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: "1\n2\n3\n4\n5\n",
+		},
+		{
+			name: "test while loop w/ nonbool condition",
+			interpreter: Interpreter{
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			statement: &statement.While{
+				Condition: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+				Body: &statement.Block{
+					Statements: []statement.Stmt{
+						&statement.Print{
+							Expression: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+						},
+						&statement.Expression{
+							Expression: &expression.Assignment{
+								Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+								Value: &expression.Binary{
+									Left:     &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+									Operator: token.Token{TokenType: token.PLUS, Lexeme: "+"},
+									Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+								},
+							},
+						},
+					},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{},
+				Message: "Condition of while loop does not evaluate to a bool",
+			},
+		},
+		{
+			name: "test while loop w/ invalid condition",
+			interpreter: Interpreter{
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			statement: &statement.While{
+				Condition: &expression.Unary{
+					Operator: token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+					Right:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+				},
+				Body: &statement.Block{
+					Statements: []statement.Stmt{
+						&statement.Print{
+							Expression: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+						},
+						&statement.Expression{
+							Expression: &expression.Assignment{
+								Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+								Value: &expression.Binary{
+									Left:     &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+									Operator: token.Token{TokenType: token.PLUS, Lexeme: "+"},
+									Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+								},
+							},
+						},
+					},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
+			name: "test while loop w/ invalid body",
+			interpreter: Interpreter{
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			statement: &statement.While{
+				Condition: &expression.Binary{
+					Left:     &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+					Operator: token.Token{TokenType: token.LESS_EQUAL, Lexeme: "<="},
+					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(5)},
+				},
+				Body: &statement.Block{
+					Statements: []statement.Stmt{
+						&statement.Expression{
+							Expression: &expression.Unary{
+								Operator: token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+								Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+							},
+						},
+					},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
+			name: "test executing then stmt",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+				ElseBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+				},
+			},
+			expected: "1\n",
+		},
+		{
+			name: "test executing else stmt",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+				ElseBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+				},
+			},
+			expected: "2\n",
+		},
+		{
+			name: "test not executing then stmt",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "test if w/ nonbool condition",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateStringLiteral("str")},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+				ElseBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{},
+				Message: "Condition of if statement does not evaluate to a bool",
+			},
+		},
+		{
+			name: "test if w/ invalid then stmt",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateBoolLiteral(true)},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Unary{
+						Operator: token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+						Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
+			name: "test if w/ invalid else stmt",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.If{
+				Condition: &expression.Literal{Value: literal.GenerateBoolLiteral(false)},
+				ThenBranch: &statement.Print{
+					Expression: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+				ElseBranch: &statement.Print{
+					Expression: &expression.Unary{
+						Operator: token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+						Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
+					},
+				},
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
 			name: "test print literal",
 			interpreter: Interpreter{
 				env: environment.GenerateEnvironment(nil),
@@ -346,6 +588,39 @@ func TestExecuteOnOutputStream(t *testing.T) {
 									Name:  token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
 									Value: &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
 								},
+							},
+							&statement.Print{
+								Expression: &expression.Variable{
+									Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+								},
+							},
+						},
+					},
+					&statement.Print{
+						Expression: &expression.Variable{
+							Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+						},
+					},
+				},
+			},
+			expected: "2\n2\n",
+		},
+		{
+			name: "test access to global variable a = 1 and local variable a = 2 in local scope",
+			interpreter: Interpreter{
+				env: environment.GenerateEnvironment(nil),
+			},
+			statement: &statement.Block{
+				Statements: []statement.Stmt{
+					&statement.Let{
+						Name:        token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+						Initializer: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					},
+					&statement.Block{
+						Statements: []statement.Stmt{
+							&statement.Let{
+								Name:        token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+								Initializer: &expression.Literal{Value: literal.GenerateNumericLiteral(2)},
 							},
 							&statement.Print{
 								Expression: &expression.Variable{
