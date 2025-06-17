@@ -10,6 +10,227 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestCall(t *testing.T) {
+	type testCase struct {
+		name   string
+		parser Parser
+
+		expected expression.Expr
+		err      error
+	}
+
+	tests := []testCase{
+		{
+			name: "test call on variable",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Call{
+				Callee: &expression.Variable{
+					Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				},
+				Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Arguments: []expression.Expr{},
+			},
+			err: nil,
+		},
+		{
+			name: "test call on primary",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Call{
+				Callee:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Arguments: []expression.Expr{},
+			},
+			err: nil,
+		},
+		{
+			name: "test call w/ one var arg",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Call{
+				Callee: &expression.Variable{
+					Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				},
+				Paren: token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Arguments: []expression.Expr{
+					&expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "n", Line: 1}},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "test call w/ multiple var args",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n1", Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n2", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Call{
+				Callee: &expression.Variable{
+					Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				},
+				Paren: token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Arguments: []expression.Expr{
+					&expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "n1", Line: 1}},
+					&expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "n2", Line: 1}},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "test call w/ expression arg",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Call{
+				Callee: &expression.Variable{
+					Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				},
+				Paren: token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Arguments: []expression.Expr{
+					&expression.Binary{
+						Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+						Operator: token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+						Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "test call w/o left paren",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &expression.Variable{
+				Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+			},
+			err: nil,
+		},
+		{
+			name: "test call w/o right paren",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected \")\" after arguments",
+			},
+		},
+		{
+			name: "test call w/ trailing comma",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "n", Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Expected expression but got )",
+			},
+		},
+		{
+			name: "test call w/ invalid arg",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Expected expression but got )",
+			},
+		},
+		{
+			name: "test call w/ 256 arguments",
+			parser: Parser{
+				Tokens: func() []token.Token {
+					tokens := []token.Token{
+						{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+						{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+					}
+					// Add 256 numeric arguments
+					for i := range 256 {
+						tokens = append(tokens, token.Token{
+							TokenType: token.NUMERIC,
+							Lexeme:    "1",
+							Literal:   literal.GenerateNumericLiteral(1),
+							Line:      1,
+						})
+						if i < 255 {
+							tokens = append(tokens, token.Token{
+								TokenType: token.COMMA,
+								Lexeme:    ",",
+								Line:      1,
+							})
+						}
+					}
+					tokens = append(tokens,
+						token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+						token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+					)
+					return tokens
+				}(),
+				Curr: 0,
+			},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.COMMA, Lexeme: ",", Line: 1},
+				Message: "A call cannot have more than 255 arguments",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := test.parser.and()
+			if test.err != nil {
+				assert.EqualError(t, err, test.err.Error())
+			}
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
 func TestOr(t *testing.T) {
 	type testCase struct {
 		name   string

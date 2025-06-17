@@ -13,16 +13,19 @@ import (
 	"github.com/rokkunbruv/internals/token"
 )
 
+// Output buffer stream to direct any output from print statements to
 var out io.Writer = os.Stdout
 
 type Interpreter struct {
-	Statements []statement.Stmt        // List of statements from source code
+	Statements []statement.Stmt // List of statements from source code
+	Globals    environment.Environment
 	env        environment.Environment // Environment the interpreter is currently in
 }
 
 // Executes the parsed AST
 func (i *Interpreter) Interpret() error {
-	i.env = environment.GenerateEnvironment(nil)
+	i.Globals = UseNativeFunctions()
+	i.env = i.Globals
 
 	for _, statement := range i.Statements {
 		err := i.execute(statement)
@@ -44,17 +47,46 @@ func (i *Interpreter) execute(stmt statement.Stmt) error {
 
 // Evaluates an expression
 func (i *Interpreter) evaluate(exp expression.Expr) (literal.Literal, error) {
-	litObj, err := exp.Accept(i)
+	res, err := exp.Accept(i)
 	if err != nil {
 		return nil, err
 	}
 
-	lit, ok := litObj.(literal.Literal)
+	// Only return either literals or callables and nothing else
+	lit, ok := res.(literal.Literal)
 	if !ok {
-		return nil, &exu_err.CastError{Message: "Evaluated result of if condition does not result to a literal."}
+		return nil, &exu_err.CastError{Message: "Evaluated result of expression does not result to a literal"}
 	}
 
-	return lit, err
+	return lit, nil
+}
+
+func (i *Interpreter) VisitReturnStmt(stmt *statement.Return) error {
+	var value literal.Literal
+
+	// If no return value is specified, default to null literal
+	if stmt.Value != nil {
+		// Explicitly declare err to avoid redeclaring value
+		var err error
+
+		value, err = i.evaluate(stmt.Value)
+		if err != nil {
+			return err
+		}
+	} else {
+		value = &literal.NullLiteral{}
+	}
+
+	return &Return{Value: value}
+}
+
+func (i *Interpreter) VisitFunctionStmt(stmt *statement.Function) error {
+	function := &Function{Declaration: *stmt, Closure: i.env}
+
+	// Add function binding to environment
+	i.env.Define(stmt.Name.Lexeme, function)
+
+	return nil
 }
 
 func (i *Interpreter) VisitWhileStmt(stmt *statement.While) error {
@@ -134,16 +166,23 @@ func (i *Interpreter) VisitIfStmt(stmt *statement.If) error {
 }
 
 func (i *Interpreter) VisitBlockStmt(stmt *statement.Block) error {
+	// Bind current environment to a variable to avoid
+	// creating infinite enclosings of current env
+	currEnv := i.env
+	return i.executeBlock(stmt.Statements, environment.GenerateEnvironment(&currEnv))
+}
+
+// Reusable execute block function (can also be used by functions and methods)
+// Uses the provided environment to manually set the block's scope
+func (i *Interpreter) executeBlock(stmts []statement.Stmt, env environment.Environment) error {
 	// Get a reference of current env (outer scope) so the interpreter
 	// can refer back to this once we exit the block
-	outerEnv := i.env
+	prevEnv := i.env
 
-	// Shallow copy current environment to avoid recursive references
-	enclosing := i.env
-	i.env = environment.GenerateEnvironment(&enclosing)
+	i.env = env
 
 	// Execute statements inside the block
-	for _, statement := range stmt.Statements {
+	for _, statement := range stmts {
 		err := i.execute(statement)
 		if err != nil {
 			return err
@@ -151,7 +190,7 @@ func (i *Interpreter) VisitBlockStmt(stmt *statement.Block) error {
 	}
 
 	// Return the scope back to the outer scope
-	i.env = outerEnv
+	i.env = prevEnv
 
 	return nil
 }
@@ -168,6 +207,12 @@ func (i *Interpreter) VisitPrintStmt(stmt *statement.Print) error {
 	val, err := i.evaluate(stmt.Expression)
 	if err != nil {
 		return err
+	}
+
+	// If resulted value if null, do not print anything
+	_, ok := val.(*literal.NullLiteral)
+	if ok {
+		return nil
 	}
 
 	fmt.Fprintln(out, val.ToString())
@@ -196,6 +241,44 @@ func (i *Interpreter) VisitLetStmt(stmt *statement.Let) error {
 	i.env.Define(stmt.Name.Lexeme, value)
 
 	return nil
+}
+
+func (i *Interpreter) VisitCallExpr(exp *expression.Call) (any, error) {
+	// Evaluate callee
+	callee, err := i.evaluate(exp.Callee)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if result is a callable
+	function, ok := callee.(Callable)
+	if !ok {
+		return nil, &exu_err.RuntimeError{
+			Token:   exp.Paren,
+			Message: "Invalid call operation on expression. Only functions and class methods are callable",
+		}
+	}
+
+	// Evaluate arguments
+	arguments := []literal.Literal{}
+	for _, argument := range exp.Arguments {
+		result, err := i.evaluate(argument)
+		if err != nil {
+			return nil, err
+		}
+
+		arguments = append(arguments, result)
+	}
+
+	// Check no. of arguments if it matches with callable arity
+	if len(arguments) != function.Arity() {
+		return nil, &exu_err.RuntimeError{
+			Token:   exp.Paren,
+			Message: fmt.Sprintf("Expected %v arguments but got %v", function.Arity(), len(arguments)),
+		}
+	}
+
+	return function.Call(*i, arguments)
 }
 
 // This implementation iteratively checks each expression, ending the chain

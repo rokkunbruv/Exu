@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"testing"
 
 	exu_err "github.com/rokkunbruv/internals/err"
@@ -10,6 +11,394 @@ import (
 	"github.com/rokkunbruv/internals/token"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestFuncDeclaration(t *testing.T) {
+	type testCase struct {
+		name   string
+		parser Parser
+
+		expected statement.Stmt
+		err      error
+	}
+
+	tests := []testCase{
+		{
+			name: "test fn declaration w/o args",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Function{
+				Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				Params: []token.Token{},
+				Body:   []statement.Stmt{},
+			},
+			err: nil,
+		},
+		{
+			name: "test fn decl w/ arg",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Function{
+				Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				Params: []token.Token{
+					{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				},
+				Body: []statement.Stmt{},
+			},
+			err: nil,
+		},
+		{
+			name: "test fn decl w/ multiple args",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "b", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Function{
+				Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				Params: []token.Token{
+					{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+					{TokenType: token.IDENTIFIER, Lexeme: "b", Line: 1},
+				},
+				Body: []statement.Stmt{},
+			},
+			err: nil,
+		},
+		{
+			name: "test fn decl w/ no func name",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				Message: "Expected function name",
+			},
+		},
+		{
+			name: "test fn decl w/ no block",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected \"{\" before function parameters",
+			},
+		},
+		{
+			name: "test fn decl w/ no params",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				Message: "Expected \"(\" after function name",
+			},
+		},
+		{
+			name: "test fn declaration with missing left paren",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Expected \"(\" after function name",
+			},
+		},
+		{
+			name: "test fn declaration w/o right paren",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				Message: "Expected parameter name",
+			},
+		},
+		{
+			name: "test fn declaration w/o left brace",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				Message: "Expected \"{\" before function parameters",
+			},
+		},
+		{
+			name: "test fn declaration w/o right brace",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected \"}\" after block.",
+			},
+		},
+		{
+			name: "test fn declaration w/ trailing comma in params",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.COMMA, Lexeme: ",", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Expected parameter name",
+			},
+		},
+		{
+			name: "test fn declaration w/ invalid params",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				Message: "Expected parameter name",
+			},
+		},
+		{
+			name: "test fn declaration w/ invalid block",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.FN, Lexeme: "fn", Line: 1},
+				{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+				{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				Message: "Expected expression but got ;",
+			},
+		},
+		{
+			name: "test fn declaration w/ 256 params",
+			parser: Parser{
+				Tokens: func() []token.Token {
+					tokens := []token.Token{
+						{TokenType: token.FN, Lexeme: "fn", Line: 1},
+						{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+						{TokenType: token.LEFT_PAREN, Lexeme: "(", Line: 1},
+					}
+					// Add 256 parameters
+					for i := 0; i < 256; i++ {
+						tokens = append(tokens, token.Token{
+							TokenType: token.IDENTIFIER,
+							Lexeme:    fmt.Sprintf("p%d", i),
+							Line:      1,
+						})
+						if i < 255 {
+							tokens = append(tokens, token.Token{
+								TokenType: token.COMMA,
+								Lexeme:    ",",
+								Line:      1,
+							})
+						}
+					}
+					tokens = append(tokens,
+						token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+						token.Token{TokenType: token.LEFT_BRACE, Lexeme: "{", Line: 1},
+						token.Token{TokenType: token.RIGHT_BRACE, Lexeme: "}", Line: 1},
+						token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+					)
+					return tokens
+				}(),
+				Curr: 0,
+			},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "p255", Line: 1},
+				Message: "A function cannot have more than 255 arguments",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := test.parser.declaration()
+			if test.err != nil {
+				assert.EqualError(t, err, test.err.Error())
+			}
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
+func TestReturnStatement(t *testing.T) {
+	type testCase struct {
+		name   string
+		parser Parser
+
+		expected statement.Stmt
+		err      error
+	}
+
+	tests := []testCase{
+		{
+			name: "test return w/ no value",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Return{
+				Keyword: token.Token{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				Value:   nil,
+			},
+			err: nil,
+		},
+		{
+			name: "test return w/ value",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Return{
+				Keyword: token.Token{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				Value:   &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+			},
+			err: nil,
+		},
+		{
+			name: "test return w/ expr",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: &statement.Return{
+				Keyword: token.Token{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				Value: &expression.Binary{
+					Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+					Operator: token.Token{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+					Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "test return w/ invalid expr",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				{TokenType: token.NUMERIC, Lexeme: "1", Literal: literal.GenerateNumericLiteral(1), Line: 1},
+				{TokenType: token.PLUS, Lexeme: "+", Line: 1},
+				{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.SEMICOLON, Lexeme: ";", Line: 1},
+				Message: "Expected expression but got ;",
+			},
+		},
+		{
+			name: "test return w/ no semicolon",
+			parser: Parser{Tokens: []token.Token{
+				{TokenType: token.RETURN, Lexeme: "return", Line: 1},
+				{TokenType: token.EOF, Lexeme: "", Line: 1},
+			}, Curr: 0},
+			expected: nil,
+			err: &exu_err.SyntaxError{
+				Token:   token.Token{TokenType: token.EOF, Lexeme: "", Line: 1},
+				Message: "Expected expression but got ",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual, err := test.parser.statement()
+			if test.err != nil {
+				assert.EqualError(t, err, test.err.Error())
+			}
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
 
 func TestForStatement(t *testing.T) {
 	type testCase struct {

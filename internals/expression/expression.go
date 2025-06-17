@@ -17,6 +17,7 @@ type Visitor interface {
 	VisitVariableExpr(*Variable) (any, error)
 	VisitAssignmentExpr(*Assignment) (any, error)
 	VisitLogicalExpr(*Logical) (any, error)
+	VisitCallExpr(*Call) (any, error)
 }
 
 type Expr interface {
@@ -83,4 +84,14 @@ type Logical struct {
 
 func (l *Logical) Accept(visitor Visitor) (any, error) {
 	return visitor.VisitLogicalExpr(l)
+}
+
+type Call struct {
+	Callee    Expr
+	Paren     token.Token
+	Arguments []Expr
+}
+
+func (c *Call) Accept(visitor Visitor) (any, error) {
+	return visitor.VisitCallExpr(c)
 }

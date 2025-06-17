@@ -8,13 +8,18 @@ Full Exu Grammar Productions Definition
 
 ```txt
 program     -> declaration* EOF
-declaration -> varDecl | statement
+declaration -> varDecl | funDecl | statement
 varDecl     -> "let" IDENTIFIER (":" expression)? ";"
-statement   -> exprStmt | printStmt | ifStmt | whileStmt | forStmt | block
+funDecl     -> "fun" function
+function    -> IDENTIFIER "(" parameters? ")" block
+parameters  -> IDENTIFIER ("," IDENTIFIER)*
+statement   -> exprStmt | printStmt | ifStmt | whileStmt | forStmt | returnStmt | block
 exprStmt    -> expression ";"
 printStmt   -> "print" expression ";"
 whileStmt   -> "while" "(" expression ")" statement
-forStmt     -> "for" "(" (varDecl | exprStmt | ";") expression? ";" expression? ")" statement
+forStmt     -> "for" "(" (varDecl | exprStmt | ";")
+returnStmt  -> "return" expression? ";"
+expression? ";" expression? ")" statement
 ifStmt      -> "if" "(" expression ")" statement ("else" statement)?
 block       -> "{" declaration* "}"
 expression  -> assignment
@@ -25,7 +30,9 @@ equality    -> comparison (( "!=" | "=" ) comparison)*
 comparison  -> term (( ">" | ">=" | "<" | "<=" ) term)*
 term        -> factor (( "+" | "-" ) factor)*
 factor      -> unary (( "*" | "/" ) unary)*
-unary       -> ( "!" | "-" ) unary | primary
+unary       -> ( "!" | "-" ) unary | call
+call        -> primary ("(" arguments? ")")*
+arguments   -> expression ( "," expression )*
 primary     -> NUMBER | STRING | "true" | "false" | "null" | "(" expression ")" | IDENTIFIER
 ```
 

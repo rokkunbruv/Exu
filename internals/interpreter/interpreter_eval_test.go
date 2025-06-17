@@ -23,6 +23,323 @@ func TestEvaluate(t *testing.T) {
 
 	tests := []testCase{
 		{
+			name: "test fn call returning the result of a local fn call",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{},
+							Body: []statement.Stmt{
+								&statement.Function{
+									Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"},
+									Params: []token.Token{},
+									Body: []statement.Stmt{
+										&statement.Return{
+											Value: &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+										},
+									},
+								},
+								&statement.Return{
+									Value: &expression.Call{
+										Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+										Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+										Arguments: []expression.Expr{},
+									},
+								},
+							},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					return env
+				}(),
+			},
+			expected: literal.GenerateNumericLiteral(1),
+		},
+		// {
+		// 	name: "test fn call returning a function",
+		// 	interpreter: Interpreter{
+		// 		Statements: []statement.Stmt{
+		// 			&statement.Expression{
+		// 				Expression: &expression.Call{
+		// 					Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+		// 					Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+		// 					Arguments: []expression.Expr{},
+		// 				},
+		// 			},
+		// 		},
+		// 		env: func() environment.Environment {
+		// 			env := environment.GenerateEnvironment(nil)
+		// 			env.Define("a", &Function{
+		// 				Declaration: statement.Function{
+		// 					Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"},
+		// 					Params: []token.Token{},
+		// 					Body:   []statement.Stmt{},
+		// 				},
+		// 				Closure: environment.GenerateEnvironment(nil),
+		// 			})
+		// 			return env
+		// 		}(),
+		// 	},
+		// 	expected: &Function{
+		// 		Declaration: statement.Function{
+		// 			Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"},
+		// 			Params: []token.Token{},
+		// 			Body:   []statement.Stmt{},
+		// 		},
+		// 		Closure: func() environment.Environment {
+		// 			enclosing := environment.GenerateEnvironment(nil)
+		// 			env := environment.GenerateEnvironment(&enclosing)
+		// 			env.Define("a", &Function{
+		// 				Declaration: statement.Function{
+		// 					Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+		// 					Params: []token.Token{},
+		// 					Body: []statement.Stmt{
+		// 						&statement.Function{
+		// 							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"},
+		// 							Params: []token.Token{},
+		// 							Body:   []statement.Stmt{},
+		// 						},
+		// 						&statement.Return{
+		// 							Value: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+		// 						},
+		// 					},
+		// 				},
+		// 				Closure: environment.GenerateEnvironment(nil),
+		// 			})
+		// 			return env
+		// 		}(),
+		// 	},
+		// },
+		{
+			name: "test valid function call of already declared fn",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{},
+							Body:   []statement.Stmt{},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					return env
+				}(),
+			},
+			expected: &literal.NullLiteral{},
+		},
+		{
+			name: "test valid function call of undeclared fn",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee: &expression.Variable{
+								Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+							},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: environment.GenerateEnvironment(nil),
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a", Line: 1},
+				Message: "Cannot get value of undefined variable \"a\"",
+			},
+		},
+		{
+			name: "test call on non-function variable",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Invalid call operation on expression. Only functions and class methods are callable",
+			},
+		},
+		{
+			name: "test call on literal",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: environment.GenerateEnvironment(nil),
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Invalid call operation on expression. Only functions and class methods are callable",
+			},
+		},
+		{
+			name: "test valid function call w/ arg",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:  token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{
+								&expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+							},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+							Body:   []statement.Stmt{},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					env.Define("b", literal.GenerateNumericLiteral(1))
+					return env
+				}(),
+			},
+			expected: &literal.NullLiteral{},
+		},
+		{
+			name: "test function call w/ mismatched args",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee:    &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:     token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+							Arguments: []expression.Expr{},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+							Body:   []statement.Stmt{},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					return env
+				}(),
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")", Line: 1},
+				Message: "Expected 1 arguments but got 0",
+			},
+		},
+		{
+			name: "test function call w/ expression arg",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:  token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{
+								&expression.Binary{
+									Left:     &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+									Operator: token.Token{TokenType: token.PLUS, Lexeme: "+"},
+									Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+								},
+							},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+							Body:   []statement.Stmt{},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					return env
+				}(),
+			},
+			expected: &literal.NullLiteral{},
+		},
+		{
+			name: "test function call w/ invalid arg",
+			interpreter: Interpreter{
+				Statements: []statement.Stmt{
+					&statement.Expression{
+						Expression: &expression.Call{
+							Callee: &expression.Variable{Name: token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"}},
+							Paren:  token.Token{TokenType: token.RIGHT_PAREN, Lexeme: ")"},
+							Arguments: []expression.Expr{
+								&expression.Unary{
+									Operator: token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+									Right:    &expression.Literal{Value: literal.GenerateNumericLiteral(1)},
+								},
+							},
+						},
+					},
+				},
+				env: func() environment.Environment {
+					env := environment.GenerateEnvironment(nil)
+					env.Define("a", &Function{
+						Declaration: statement.Function{
+							Name:   token.Token{TokenType: token.IDENTIFIER, Lexeme: "a"},
+							Params: []token.Token{{TokenType: token.IDENTIFIER, Lexeme: "b"}},
+							Body:   []statement.Stmt{},
+						},
+						Closure: environment.GenerateEnvironment(nil),
+					})
+					return env
+				}(),
+			},
+			err: &exu_err.RuntimeError{
+				Token:   token.Token{TokenType: token.NOT, Lexeme: "!", Line: 1},
+				Message: "Operation ! cannot be performed on type Numeric",
+			},
+		},
+		{
 			name: "test and resulting to true",
 			interpreter: Interpreter{
 				Statements: []statement.Stmt{&statement.Expression{

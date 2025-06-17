@@ -42,7 +42,7 @@ func (e *Environment) Get(name token.Token) (literal.Literal, error) {
 		return e.enclosing.Get(name)
 	}
 
-	// Return error if the variable isnt defined in any of the scopes
+	// Return error if the variable isnt defined in literal.Literal of the scopes
 	return nil, &exu_err.RuntimeError{
 		Token:   name,
 		Message: fmt.Sprintf("Cannot get value of undefined variable \"%v\"", name.Lexeme),
@@ -62,7 +62,7 @@ func (e *Environment) Assign(name token.Token, value literal.Literal) error {
 		return e.enclosing.Assign(name, value)
 	}
 
-	// Return error if the variable isnt defined in any of the scopes
+	// Return error if the variable isnt defined in literal.Literal of the scopes
 	return &exu_err.RuntimeError{
 		Token:   name,
 		Message: fmt.Sprintf("Cannot assign to undefined variable \"%v\"", name.Lexeme),

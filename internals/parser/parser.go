@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 
+	calltype "github.com/rokkunbruv/internals/call_type"
 	exu_err "github.com/rokkunbruv/internals/err"
 	"github.com/rokkunbruv/internals/expression"
 	"github.com/rokkunbruv/internals/literal"
@@ -65,7 +66,94 @@ func (p *Parser) declaration() (statement.Stmt, error) {
 		return p.varDeclaration()
 	}
 
+	// Check fn keyword
+	isFn, err := p.match(token.FN)
+	if err != nil {
+		// Exits expression tree
+		sync_err := p.synchronize()
+
+		if sync_err != nil {
+			return nil, sync_err
+		}
+
+		return nil, err
+	}
+
+	if isFn {
+		return p.funcDeclaration(string(string(calltype.FUNCTION)))
+	}
+
 	return p.statement()
+}
+
+func (p *Parser) funcDeclaration(kind string) (statement.Stmt, error) {
+	// Get function name
+	name, err := p.consume(token.IDENTIFIER, fmt.Sprintf("Expected %v name", kind))
+	if err != nil {
+		return nil, err
+	}
+
+	// Get function parameters
+	if _, err := p.consume(token.LEFT_PAREN, fmt.Sprintf("Expected \"(\" after %v name", kind)); err != nil {
+		return nil, err
+	}
+
+	parameters := []token.Token{}
+
+	if isRightParen, err := p.check(token.RIGHT_PAREN); err != nil {
+		return nil, err
+	} else if !isRightParen {
+		// Execute loop first before evaluating condition
+		// (stored in isComma)
+		isComma := true
+
+		for isComma {
+			if len(parameters) >= 255 {
+				currToken, err := p.peek()
+				if err != nil {
+					return nil, err
+				}
+
+				return nil, &exu_err.SyntaxError{
+					Token:   currToken,
+					Message: fmt.Sprintf("A %v cannot have more than 255 arguments", kind),
+				}
+			}
+
+			parameter, err := p.consume(token.IDENTIFIER, "Expected parameter name")
+			if err != nil {
+				return nil, err
+			}
+
+			parameters = append(parameters, parameter)
+
+			// Update isComma
+			isComma, err = p.match(token.COMMA)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if _, err := p.consume(token.RIGHT_PAREN, "Expected \")\" after parameters"); err != nil {
+		return nil, err
+	}
+
+	// Get function block
+	if _, err := p.consume(token.LEFT_BRACE, fmt.Sprintf("Expected \"{\" before %v parameters", kind)); err != nil {
+		return nil, err
+	}
+
+	body, err := p.block()
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.Function{
+		Name:   name,
+		Params: parameters,
+		Body:   body,
+	}, nil
 }
 
 // Parses variable declarations
@@ -132,6 +220,16 @@ func (p *Parser) statement() (statement.Stmt, error) {
 		return p.whileStatement()
 	}
 
+	// Check for return keyword
+	isReturn, err := p.match(token.RETURN)
+	if err != nil {
+		return nil, err
+	}
+
+	if isReturn {
+		return p.returnStatement()
+	}
+
 	// Check for blocks
 	isBlock, err := p.match(token.LEFT_BRACE)
 	if err != nil {
@@ -148,6 +246,36 @@ func (p *Parser) statement() (statement.Stmt, error) {
 	}
 
 	return p.exprStatement()
+}
+
+func (p *Parser) returnStatement() (statement.Stmt, error) {
+	keyword, err := p.previous()
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse return expression
+	var value expression.Expr
+	if isSemicolon, err := p.check(token.SEMICOLON); err != nil {
+		return nil, err
+	} else if !isSemicolon {
+		value, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		value = nil
+	}
+
+	_, err = p.consume(token.SEMICOLON, "Expected \";\" after return value")
+	if err != nil {
+		return nil, err
+	}
+
+	return &statement.Return{
+		Keyword: keyword,
+		Value:   value,
+	}, nil
 }
 
 func (p *Parser) forStatement() (statement.Stmt, error) {
@@ -656,7 +784,31 @@ func (p *Parser) unary() (expression.Expr, error) {
 		return &expression.Unary{Operator: operator, Right: right}, nil
 	}
 
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() (expression.Expr, error) {
+	expr, err := p.primary()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for potential call arguments
+	for {
+		if isLeftParen, err := p.match(token.LEFT_PAREN); err != nil {
+			return nil, err
+		} else if isLeftParen {
+			// Parse call arguments
+			expr, err = p.finishCall(expr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) primary() (expression.Expr, error) {
@@ -755,6 +907,62 @@ func (p *Parser) primary() (expression.Expr, error) {
 		Token:   currToken,
 		Message: fmt.Sprintf("Expected expression but got %v", currToken.Lexeme),
 	}
+}
+
+// HELPER FUNCTIONS
+
+// Parses call arguments
+func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
+	arguments := []expression.Expr{}
+
+	if isRightParen, err := p.check(token.RIGHT_PAREN); err != nil {
+		return nil, err
+	} else if !isRightParen {
+		// Parse arguments into a list
+		// Execute loop first before evaluating condition
+		// (stored in isComma)
+		isComma := true
+
+		for isComma {
+			// If no. of arguments exceed 255, display an error
+			// but continue parsing the expression
+			// Treat this like displaying a warning
+			if len(arguments) >= 255 {
+				currToken, err := p.peek()
+				if err != nil {
+					return nil, err
+				}
+
+				return nil, &exu_err.SyntaxError{
+					Token:   currToken,
+					Message: "A call cannot have more than 255 arguments",
+				}
+			}
+
+			argument, err := p.expression()
+			if err != nil {
+				return nil, err
+			}
+
+			arguments = append(arguments, argument)
+
+			isComma, err = p.match(token.COMMA)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	paren, err := p.consume(token.RIGHT_PAREN, "Expected \")\" after arguments")
+	if err != nil {
+		return nil, err
+	}
+
+	return &expression.Call{
+		Callee:    callee,
+		Paren:     paren,
+		Arguments: arguments,
+	}, nil
 }
 
 // Return true and moves the curr ptr to the next
