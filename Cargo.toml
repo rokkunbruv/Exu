@@ -1,0 +1,8 @@
+[package]
+name = "Exu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chumsky = { version = "0.10.1", features = ["pratt"] }
+clap = "4.5.41"

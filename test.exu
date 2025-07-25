@@ -1,0 +1,9 @@
+proc main() {
+    let num c: 5;
+    
+    let fn a: fn(num a, num b) -> num {
+        ret a + b + c;
+    }
+
+    println << a(2, 3);
+}
