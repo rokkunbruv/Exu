@@ -1,3 +1,4 @@
+use crate::cli::{display_debug_info_toggle, display_vm_states_toggle, Cli};
 use crate::compiler::Executable;
 use crate::instruction::Instr;
 use crate::value::Value;
@@ -36,15 +37,22 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self, program: Executable) {
+    pub fn run(&mut self, cli: &Cli, program: Executable) {
+        let display_debug_info = display_debug_info_toggle(cli);
+        let display_vm_states = display_vm_states_toggle(cli);
+
         let instrs = program.instructions;
 
         let mut pc = instrs.iter().enumerate().skip(0);
 
-        println!("=====EXECUTING INSTRUCTIONS=====");
+        if display_debug_info {
+            println!("=====EXECUTING INSTRUCTIONS=====");
+        }
 
         while let Some((pc_loc, instr)) = pc.next() {
-            println!("PC={:?} {:?}", pc_loc, instr);
+            if display_debug_info {
+                println!("PC={:?} {:?}", pc_loc, instr);
+            }
 
             match instr.clone() {
                 Instr::Mov { dest, src } => {
@@ -164,10 +172,12 @@ impl VM {
                 _ => {}
             }
 
-            for reg in self.registers.iter() {
-                print!("{:?} ", reg);
+            if display_vm_states {
+                for reg in self.registers.iter() {
+                    print!("{:?} ", reg);
+                }
+                println!("\n");
             }
-            println!("\n");
         }
     }
 

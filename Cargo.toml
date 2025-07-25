@@ -2,7 +2,8 @@
 name = "Exu"
 version = "0.1.0"
 edition = "2021"
+description = "The official interpreter of the Exu programming langauge."
 
 [dependencies]
 chumsky = { version = "0.10.1", features = ["pratt"] }
-clap = "4.5.41"
+clap = { version = "4.5.41", features = ["derive"] }
