@@ -12,25 +12,28 @@ const NO_RETURN_BLOCK: Option<&Type> = None;
 
 #[derive(Clone)]
 pub struct TypeChecker<'prog> {
-    objs: Vec<(&'prog str, Type)>,
+    /// A stack of declared variables. Each variable is a tuple of the variable's name and type
     var_stack: Vec<(&'prog str, Type)>,
+    /// A stack of scopes the typechecker entered. Each scope is an index in the var_stack to the first local variable declared in the scope
     scopes: Vec<usize>,
+    /// A list of declared procedures. The use of a hashmap enforces uniqueness in identifying procedures
+    /// and is not concerned with procedures declared within procedures (as they must be declared globally).
     procedures: HashMap<&'prog str, Type>,
 }
 
 impl<'prog> TypeChecker<'prog> {
     pub fn new() -> Self {
         Self {
-            objs: Vec::new(),
             var_stack: Vec::new(),
             scopes: Vec::new(),
             procedures: HashMap::new(),
         }
     }
 
+    /// Performs typechecking over the entire program
+    /// Returns an Ok if the program is type-consistent else return an error
     pub fn check_type(&mut self, program: &'prog Program<'prog>) -> Result<(), Box<dyn Error>> {
         // Brings all defined procedures to the global scope before performing type checking
-        // Perform type checking on procedure definitions
         for (program_item, _) in program.items.iter() {
             match program_item {
                 ProgramItem::Proc {
@@ -44,12 +47,12 @@ impl<'prog> TypeChecker<'prog> {
                         .map(|((_, type_), _)| type_.clone())
                         .collect::<Vec<_>>();
 
-                    let r_type = match ret_type {
+                    let return_type = match ret_type {
                         Some((type_, _)) => Some(type_.clone()),
                         None => None,
                     };
 
-                    self.define_procedure_type(name, params_type, r_type);
+                    self.define_procedure_type(name, params_type, return_type);
                 }
             }
         }
@@ -63,7 +66,9 @@ impl<'prog> TypeChecker<'prog> {
                     ret_type,
                     body,
                 } => {
-                    self.init_objs();
+                    // Each visit on a procedure subtree resets var_stack and scopes
+                    // since variables and scoping don't share across procedure definitions
+                    self.init_states();
 
                     for ((param_name, param_type), _) in params {
                         self.define_var_type(param_name, param_type.clone());
@@ -306,6 +311,7 @@ impl<'prog> TypeChecker<'prog> {
                 expect_matched_types(vec![Type::Num, Type::Str, Type::Bool], &type1, &type2)?;
                 Ok(Type::Bool)
             }
+            Expr::Error => panic!("Fatal error: Attempting to typecheck an error expression")
         }
     }
 
@@ -394,7 +400,7 @@ impl<'prog> TypeChecker<'prog> {
         );
     }
 
-    fn init_objs(&mut self) {
+    fn init_states(&mut self) {
         self.var_stack = Vec::new();
         self.scopes = Vec::new();
     }

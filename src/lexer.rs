@@ -1,11 +1,12 @@
 use chumsky::{extra, prelude::*};
 
 use crate::token::Token;
-use crate::types::Type;
 use crate::value::Value;
 use crate::Span;
 use crate::Spanned;
 
+/// Exu lexer
+/// Converts a source string to a list of tokens
 pub fn lexer<'src>(
 ) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     // Tokenize numeric literals
@@ -49,6 +50,7 @@ pub fn lexer<'src>(
         just(',').to(Token::Comma),
     ));
 
+    // Tokenize grouping symbols
     let grouping = choice((
         just('(').to(Token::LeftParen),
         just(')').to(Token::RightParen),
@@ -92,7 +94,7 @@ pub fn lexer<'src>(
         .map_with(|tok, e| (tok, e.span()))
         .padded_by(comment.repeated())
         .padded()
-        .recover_with(skip_then_retry_until(any().ignored(), end()))
+        .recover_with(skip_then_retry_until(any().ignored(), end())) // In case of error, skip to the next substring that can be tokenized
         .repeated()
         .collect()
 }

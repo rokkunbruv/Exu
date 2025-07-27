@@ -20,12 +20,6 @@ const START_REGISTER: Register = 1;
 // The starting address index to store objects
 const START_ADDRESS: Address = 0;
 
-// Flags to enable/disable instantiating a scope around a standalone block
-const ENABLE_SCOPING: bool = true;
-const DISABLE_SCOPING: bool = false;
-
-//
-
 #[derive(Debug)]
 pub struct Executable<'prog> {
     pub labels: HashMap<&'prog str, Address>,
@@ -138,14 +132,10 @@ impl<'prog> Compiler<'prog> {
                 ProgramItem::Proc {
                     name,
                     params,
-                    ret_type,
+                    ret_type: _,
                     body,
                 } => {
-                    let r_type = match ret_type {
-                        Some((type_, _)) => Some(type_.clone()),
-                        None => None,
-                    };
-                    self.compile_procedure(name, params, &r_type, body)?;
+                    self.compile_procedure(name, params, body)?;
                 }
             };
         }
@@ -195,7 +185,6 @@ impl<'prog> Compiler<'prog> {
         &mut self,
         name: &&'prog str,
         params: &Vec<Spanned<(&'prog str, Type)>>,
-        ret_type: &Option<Type>,
         body: &Vec<Spanned<Stmt<'prog>>>,
     ) -> Result<(), Box<dyn Error>> {
         // Move curr register ptr at first register
@@ -213,7 +202,7 @@ impl<'prog> Compiler<'prog> {
 
         // Define parameters at first couple of registers
         for ((param, _), _) in params {
-            self.define_var(param, self.curr_reg.clone());
+            self.define_var(param, self.curr_reg.clone())?;
             self.curr_reg += 1;
         }
 
@@ -337,7 +326,7 @@ impl<'prog> Compiler<'prog> {
                     )));
                 }
 
-                self.define_var(name, self.curr_reg - 1);
+                self.define_var(name, self.curr_reg - 1)?;
 
                 init_instrs
             }
@@ -352,14 +341,14 @@ impl<'prog> Compiler<'prog> {
 
                 self.upvalues = Vec::new();
 
-                self.define_var(name, self.curr_reg);
+                self.define_var(name, self.curr_reg)?;
                 self.curr_reg += 1;
 
                 let fn_addr = self.curr_addr;
 
                 // Define parameters at first couple of registers
                 for ((param, _), _) in params {
-                    self.define_var(param, self.curr_reg.clone());
+                    self.define_var(param, self.curr_reg.clone())?;
                     self.curr_reg += 1;
                 }
 
@@ -737,7 +726,7 @@ impl<'prog> Compiler<'prog> {
                     get_ret_val_instrs,
                 ]))
             }
-            _ => todo!(),
+            Expr::Error => panic!("Fatal error: Attempting to compile an error expression"),
         }
     }
 

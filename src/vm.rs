@@ -1,5 +1,5 @@
-use crate::cli::{display_debug_info_toggle, display_vm_states_toggle, Cli};
 use crate::compiler::Executable;
+use crate::debug::DebugConfig;
 use crate::instruction::Instr;
 use crate::value::Value;
 use std::fmt;
@@ -7,8 +7,10 @@ use std::fmt;
 pub type Register = usize;
 pub type Address = usize;
 
+pub type RegisterType = [Slot; 24];
+
 #[derive(Clone, PartialEq)]
-enum Slot {
+pub enum Slot {
     Val(Value),
     Addr(Address),
 }
@@ -23,7 +25,7 @@ impl fmt::Debug for Slot {
 }
 
 pub struct VM {
-    registers: [Slot; 24],
+    registers: RegisterType,
     stack: Vec<Slot>,
     heap: Vec<Slot>,
 }
@@ -37,21 +39,22 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self, cli: &Cli, program: Executable) {
-        let display_debug_info = display_debug_info_toggle(cli);
-        let display_vm_states = display_vm_states_toggle(cli);
-
+    pub fn run(&mut self, debug_config: Option<DebugConfig>, program: Executable) {
         let instrs = program.instructions;
 
         let mut pc = instrs.iter().enumerate().skip(0);
 
-        if display_debug_info {
-            println!("=====EXECUTING INSTRUCTIONS=====");
+        if let Some(dbg_cfg) = &debug_config {
+            if dbg_cfg.debug_flags.debug_config {
+                println!("=====EXECUTING INSTRUCTIONS=====");
+            }
         }
 
+        let mut instr_count: u32 = 0;
+
         while let Some((pc_loc, instr)) = pc.next() {
-            if display_debug_info {
-                println!("PC={:?} {:?}", pc_loc, instr);
+            if let Some(dbg_cfg) = &debug_config {
+                dbg_cfg.log_instr(instr, instr_count);
             }
 
             match instr.clone() {
@@ -84,10 +87,6 @@ impl VM {
                     } else {
                         panic!("Invalid use of plus operator on non-values");
                     }
-                }
-                Instr::AddI { dest, src, imm } => {
-                    let sum = self.get_num(src) + self.get_imm(imm);
-                    self.load_to_reg(dest, Slot::Val(Value::Num(sum)));
                 }
                 Instr::Sub { dest, src1, src2 } => {
                     let diff = self.get_num(src1) - self.get_num(src2);
@@ -169,15 +168,13 @@ impl VM {
                 Instr::Println { src } => {
                     println!("{:?}", &self.registers[src]);
                 }
-                _ => {}
             }
 
-            if display_vm_states {
-                for reg in self.registers.iter() {
-                    print!("{:?} ", reg);
-                }
-                println!("\n");
+            if let Some(dbg_cfg) = &debug_config {
+                dbg_cfg.log_vm_state(&self.registers);
             }
+
+            instr_count += 1;
         }
     }
 
@@ -192,13 +189,6 @@ impl VM {
         match self.registers[reg] {
             Slot::Val(Value::Bool(b)) => b,
             _ => panic!("Value in register not a boolean."),
-        }
-    }
-
-    fn get_imm(&self, imm: Value) -> f64 {
-        match imm {
-            Value::Num(n) => n,
-            _ => 0.0,
         }
     }
 

@@ -7,6 +7,8 @@ use crate::Span;
 use crate::Spanned;
 use chumsky::{input::ValueInput, pratt::*, prelude::*};
 
+/// Exu parser
+/// Converts a list of tokens to an AST
 pub fn parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Program<'src>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
@@ -20,6 +22,7 @@ where
         .map_with(|p, _| Program::new(p))
 }
 
+/// Parser for procedures
 fn proc_decl_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<ProgramItem<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>>
        + Clone
@@ -54,14 +57,22 @@ where
                 e.span(),
             )
         })
+        // In case of errors, skip to the next procedure declaration
+        .recover_with(skip_then_retry_until(
+            any().ignored(),
+            just(Token::Proc).ignored(),
+        ))
 }
 
+/// Parser for statements
 fn stmt_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<Stmt<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
     recursive(|s| {
+        // STATEMENT COMBINATORS
+
         let block = s
             .clone()
             .repeated()
@@ -115,6 +126,8 @@ where
             .or(if_stmt)
             .or(block_stmt);
 
+        // DECLARATION COMBINATORS
+
         let var_decl = var_decl_parser().map_with(|(decl, _), _| decl);
 
         let fn_decl = just(Token::Let)
@@ -134,16 +147,32 @@ where
 
         let decl = var_decl.or(fn_decl);
 
-        stmt.or(decl).map_with(|stmt, e| (stmt, e.span()))
+        stmt.or(decl)
+            .map_with(|stmt, e| (stmt, e.span()))
+            // In case of errors, skip to the next statement
+            .recover_with(skip_then_retry_until(
+                any().ignored(),
+                one_of([
+                    Token::Semicolon,
+                    Token::LeftBrace,
+                    Token::RightBrace,
+                    Token::Let,
+                    Token::If,
+                    Token::Println,
+                    Token::Ret,
+                ])
+                .ignored(),
+            ))
     })
 }
 
+/// Parser for variable declarations
 fn var_decl_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<Stmt<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
-    let ident = ident_parser();
+    let name = ident_parser();
 
     let var_type = type_parser();
 
@@ -155,7 +184,7 @@ where
 
     just(Token::Let)
         .ignore_then(var_type)
-        .then(ident)
+        .then(name)
         .then(init)
         .then_ignore(just(Token::Semicolon))
         .map_with(|((var_type, name), init), e| {
@@ -170,15 +199,18 @@ where
         })
 }
 
+/// Parser for expressions
 fn expr_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<Expr<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
+    // Combinator for operators
     let op = |op| just(op).map_with(|op, e| (op, e.span()));
 
     // Pratt expression parser in descending precedence
     recursive(|expr| {
+        // Combinator for identifiers and literals
         let atom = select! {
             Token::Val(Value::Num(x)) => Expr::Val(Value::Num(x)),
             Token::Val(Value::Str(x)) => Expr::Val(Value::Str(x)),
@@ -187,13 +219,20 @@ where
         }
         .map_with(|expr, e| (expr, e.span()));
 
+        // Combinator for parenthesized expressions
         let grouping = expr
             .clone()
             .delimited_by(just(Token::LeftParen), just(Token::RightParen));
 
+        // Combinator for call expressions
         let call = ident_parser()
             .then(
                 expr.clone()
+                    // In case of errors, skip to the next argument
+                    .recover_with(skip_then_retry_until(
+                        any().ignored(),
+                        one_of([Token::Comma, Token::RightParen]).ignored(),
+                    ))
                     .separated_by(just(Token::Comma))
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LeftParen), just(Token::RightParen)),
@@ -301,9 +340,17 @@ where
         ));
 
         expr
+            // In case of errors, attempt to recover a parenthesized expression with error
+            .recover_with(via_parser(nested_delimiters(
+                Token::LeftBrace,
+                Token::RightBrace,
+                [],
+                |e| (Expr::Error, e),
+            )))
     })
 }
 
+/// Parser for parameters
 fn params_parser<'tokens, 'src: 'tokens, I>() -> impl Parser<
     'tokens,
     I,
@@ -324,8 +371,14 @@ where
             None => Vec::new(),
         })
         .delimited_by(just(Token::LeftParen), just(Token::RightParen))
+        // In case of errors, skip to the next parameter
+        .recover_with(skip_then_retry_until(
+            any().ignored(),
+            one_of([Token::Comma, Token::RightBrace]).ignored(),
+        ))
 }
 
+/// Parser for types
 fn type_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<Type>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
@@ -338,6 +391,11 @@ where
         let func = just(Token::Fn)
             .ignore_then(
                 t.clone()
+                    // In case of errors, skip to the next parameter type
+                    .recover_with(skip_then_retry_until(
+                        any().ignored(),
+                        one_of([Token::Comma, Token::RightParen]).ignored(),
+                    ))
                     .separated_by(just(Token::Comma))
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LeftParen), just(Token::RightParen)),
@@ -354,6 +412,7 @@ where
     .map_with(|type_, e| (type_, e.span()))
 }
 
+/// Parser for identifiers
 fn ident_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, &'src str, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where

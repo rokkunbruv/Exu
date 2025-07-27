@@ -16,3 +16,19 @@ impl fmt::Debug for Value {
         }
     }
 }
+
+impl ToString for Value {
+    fn to_string(&self) -> String {
+        match self {
+            Value::Num(n) => n.to_string(),
+            Value::Str(s) => s.clone(),
+            Value::Bool(b) => {
+                if *b {
+                    String::from("true")
+                } else {
+                    String::from("false")
+                }
+            }
+        }
+    }
+}

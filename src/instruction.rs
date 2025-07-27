@@ -28,11 +28,6 @@ pub enum Instr<'a> {
         src1: Register,
         src2: Register,
     },
-    AddI {
-        dest: Register,
-        src: Register,
-        imm: Value,
-    },
     Sub {
         dest: Register,
         src1: Register,

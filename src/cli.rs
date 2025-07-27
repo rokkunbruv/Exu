@@ -15,7 +15,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Sets the interpreter to debug mode
+    /// Set the interpreter to debug mode
     Debug(DebugArgs),
 }
 
@@ -25,25 +25,37 @@ pub struct DebugArgs {
     #[arg(value_parser = verify_file_signature)]
     pub path: Option<String>,
 
-    /// Displays the debugging information of the interpreter
+    /// Display the debugging information of the interpreter
     #[arg(short, long)]
-    pub debug_info: bool,
+    pub debug_config: bool,
 
-    /// Generates a file containing the tokenized source code
+    /// Generate a file containing the tokenized source code
     #[arg(long)]
     pub gen_tokens: bool,
 
-    /// Generates a file containing the equivalent AST of the source code
+    /// Generate a file containing the equivalent AST of the source code
     #[arg(long)]
     pub gen_ast: bool,
 
-    /// Generates a file containing the compiled bytecode instructions
+    /// Generate a file containing the compiled bytecode instructions
     #[arg(long)]
     pub gen_instr: bool,
 
-    /// Displays the register and heap states of each executed instruction during runtime
+    /// Display the register and heap states of each executed instruction during runtime
     #[arg(long)]
     pub show_vm_states: bool,
+
+    /// Stop the interpreter after the parsing stage
+    #[arg(short = 'p', long)]
+    pub halt_at_parse: bool,
+
+    /// Stop the interpreter after the typecheck stage
+    #[arg(short = 't', long)]
+    pub halt_at_typecheck: bool,
+
+    /// Stop the interpreter after the compile stage
+    #[arg(short = 'c', long)]
+    pub halt_at_compile: bool,
 }
 
 /// Verifies if the file path passed has the .exu file extension
@@ -54,23 +66,5 @@ fn verify_file_signature(path: &str) -> Result<String, String> {
         Err(format!(
             "Invalid file passed. Your source file must end with the \".exu\" file extension."
         ))
-    }
-}
-
-// Toggle functions to enable/disable features depending on passed flags
-
-pub fn display_debug_info_toggle(cli: &Cli) -> bool {
-    if let Some(Commands::Debug(args)) = &cli.command {
-        args.debug_info
-    } else {
-        false
-    }
-}
-
-pub fn display_vm_states_toggle(cli: &Cli) -> bool {
-    if let Some(Commands::Debug(args)) = &cli.command {
-        args.show_vm_states
-    } else {
-        false
     }
 }

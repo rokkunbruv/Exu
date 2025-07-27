@@ -66,4 +66,6 @@ pub enum Expr<'a> {
     LessEq(Box<Spanned<Self>>, Box<Spanned<Self>>),
     Eq(Box<Spanned<Self>>, Box<Spanned<Self>>),
     NotEq(Box<Spanned<Self>>, Box<Spanned<Self>>),
+
+    Error,
 }
