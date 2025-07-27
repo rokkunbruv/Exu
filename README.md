@@ -6,17 +6,13 @@ Exu is my first hobby programming language written in Rust. It is a general-purp
 
 For a detailed documentation of the language features and syntax of Exu, refer to the [wiki](https://github.com/rokkunbruv/Exu/wiki/Exu's-Syntax-and-Semantics).
 
-### Statically-Typed
+### Static Typing
 
 Exu requires its users to explicitly declare the variable types. It currently supports **numeric** _(64-bit floating point numbers)_, **string**, **boolean**, **function**, and **entity** types.
 
 ### First-Class Functions
 
 Exu supports higher-order functions and functions as values.
-
-### Procedures
-
-Exu supports non first-class functions called **procedures**. Read the wiki to know the difference between procedures and functions.
 
 ### Entities and Actions
 
