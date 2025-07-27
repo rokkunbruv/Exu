@@ -4,7 +4,7 @@ Exu is my first hobby programming language written in Rust. It is a general-purp
 
 ## Features
 
-For a detailed documentation of the language features and syntax of Exu, refer to the wiki.
+For a detailed documentation of the language features and syntax of Exu, refer to the [wiki](https://github.com/rokkunbruv/Exu/wiki/Exu's-Syntax-and-Semantics).
 
 ### Statically-Typed
 
