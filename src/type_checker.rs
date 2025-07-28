@@ -16,9 +16,8 @@ pub struct TypeChecker<'prog> {
     var_stack: Vec<(&'prog str, Type)>,
     /// A stack of scopes the typechecker entered. Each scope is an index in the var_stack to the first local variable declared in the scope
     scopes: Vec<usize>,
-    /// A list of declared procedures. The use of a hashmap enforces uniqueness in identifying procedures
-    /// and is not concerned with procedures declared within procedures (as they must be declared globally).
-    procedures: HashMap<&'prog str, Type>,
+    /// A list of globally declared structures (functions, entities, & actions). The use of a hashmap enforces uniqueness in identifying globals
+    globals: HashMap<&'prog str, Type>,
 }
 
 impl<'prog> TypeChecker<'prog> {
@@ -26,17 +25,17 @@ impl<'prog> TypeChecker<'prog> {
         Self {
             var_stack: Vec::new(),
             scopes: Vec::new(),
-            procedures: HashMap::new(),
+            globals: HashMap::new(),
         }
     }
 
     /// Performs typechecking over the entire program
     /// Returns an Ok if the program is type-consistent else return an error
     pub fn check_type(&mut self, program: &'prog Program<'prog>) -> Result<(), Box<dyn Error>> {
-        // Brings all defined procedures to the global scope before performing type checking
+        // Brings all defined global structures to the global scope before performing type checking
         for (program_item, _) in program.items.iter() {
             match program_item {
-                ProgramItem::Proc {
+                ProgramItem::Fn {
                     name,
                     params,
                     ret_type,
@@ -52,7 +51,7 @@ impl<'prog> TypeChecker<'prog> {
                         None => None,
                     };
 
-                    self.define_procedure_type(name, params_type, return_type);
+                    self.define_global_fn_type(name, params_type, return_type);
                 }
             }
         }
@@ -60,7 +59,7 @@ impl<'prog> TypeChecker<'prog> {
         // Perform type checking on procedure definitions
         for (program_item, _) in program.items.iter() {
             match program_item {
-                ProgramItem::Proc {
+                ProgramItem::Fn {
                     name: _,
                     params,
                     ret_type,
@@ -155,7 +154,7 @@ impl<'prog> TypeChecker<'prog> {
             Stmt::FnDecl {
                 name,
                 params,
-                ret_type: (ret_type, _),
+                ret_type,
                 body,
             } => {
                 let mut params_type = Vec::new();
@@ -165,13 +164,16 @@ impl<'prog> TypeChecker<'prog> {
                     params_type.push(param_type.clone());
                 }
 
-                self.check_block_type(body, Some(ret_type))?;
+                let ret_type = match ret_type {
+                    Some((r, _)) => Some(r),
+                    None => None,
+                };
 
-                let ret_type = Box::new(ret_type.clone());
+                self.check_block_type(body, ret_type)?;
 
                 let fn_type = Type::Fn {
                     params: params_type,
-                    ret_type: ret_type,
+                    ret_type: Box::new(ret_type.cloned()),
                 };
 
                 self.define_var_type(name, fn_type);
@@ -240,9 +242,19 @@ impl<'prog> TypeChecker<'prog> {
             Expr::Ident(name) => self.get_var_type(name),
             Expr::Call { name, args } => {
                 if let Ok(fn_type) = self.get_var_type(name) {
-                    self.check_fn_call_type(&fn_type, args)
-                } else if let Ok(proc_type) = self.get_procedure_type(*name) {
-                    self.check_proc_call_type(proc_type, args)
+                    let call_type = self.check_fn_call_type(&fn_type, args)?;
+
+                    match call_type {
+                        Some(type_) => Ok(type_),
+                        None => Ok(Type::None),
+                    }
+                } else if let Ok(global_fn_type) = self.get_global_fn_type(*name) {
+                    let call_type = self.check_fn_call_type(global_fn_type, args)?;
+
+                    match call_type {
+                        Some(type_) => Ok(type_),
+                        None => Ok(Type::None),
+                    }
                 } else {
                     Err(Box::new(io::Error::new(
                         io::ErrorKind::Other,
@@ -319,7 +331,7 @@ impl<'prog> TypeChecker<'prog> {
         &self,
         fn_type: &'prog Type,
         args: &Vec<Spanned<Expr<'prog>>>,
-    ) -> Result<Type, Box<dyn Error>> {
+    ) -> Result<Option<Type>, Box<dyn Error>> {
         if let Type::Fn { params, ret_type } = fn_type {
             if params.len() != args.len() {
                 return Err(Box::new(io::Error::new(
@@ -347,55 +359,20 @@ impl<'prog> TypeChecker<'prog> {
         }
     }
 
-    fn check_proc_call_type(
-        &self,
-        proc_type: &'prog Type,
-        args: &Vec<Spanned<Expr<'prog>>>,
-    ) -> Result<Type, Box<dyn Error>> {
-        if let Type::Procedure { params, ret } = proc_type {
-            if params.len() != args.len() {
-                return Err(Box::new(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Passed arguments don't match procedure's parameter count.",
-                )));
-            }
-
-            for (param_type, arg) in params.iter().zip(args) {
-                let arg_type = self.get_expr_type(&arg)?;
-                if *param_type != arg_type.clone() {
-                    return Err(Box::new(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Passed arguments don't match procedure's parameter types",
-                    )));
-                }
-            }
-
-            match ret {
-                Some(ret_type) => Ok(*ret_type.clone()),
-                None => Ok(Type::None),
-            }
-        } else {
-            Err(Box::new(io::Error::new(
-                io::ErrorKind::Other,
-                "Unexpected type on procedure",
-            )))
-        }
-    }
-
-    fn define_procedure_type(
+    fn define_global_fn_type(
         &mut self,
         name: &'prog str,
         params_type: Vec<Type>,
         ret_type: Option<Type>,
     ) {
-        self.procedures.insert(
+        self.globals.insert(
             name,
-            Type::Procedure {
+            Type::Fn {
                 params: params_type,
-                ret: match ret_type {
-                    Some(t) => Some(Box::new(t)),
+                ret_type: Box::new(match ret_type {
+                    Some(t) => Some(t),
                     None => None,
-                },
+                }),
             },
         );
     }
@@ -421,13 +398,13 @@ impl<'prog> TypeChecker<'prog> {
         self.var_stack.push((name, var_type));
     }
 
-    fn get_procedure_type(&self, name: &'prog str) -> Result<&Type, Box<dyn Error>> {
-        if let Some((_, type_)) = self.procedures.get_key_value(name) {
+    fn get_global_fn_type(&self, name: &'prog str) -> Result<&Type, Box<dyn Error>> {
+        if let Some((_, type_)) = self.globals.get_key_value(name) {
             Ok(type_)
         } else {
             Err(Box::new(io::Error::new(
                 io::ErrorKind::Other,
-                "Procedure is not defined",
+                "Function is not defined",
             )))
         }
     }

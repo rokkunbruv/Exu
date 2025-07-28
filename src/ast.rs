@@ -4,7 +4,7 @@ use crate::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProgramItem<'a> {
-    Proc {
+    Fn {
         name: &'a str,
         params: Vec<Spanned<(&'a str, Type)>>,
         ret_type: Option<Spanned<Type>>,
@@ -40,7 +40,7 @@ pub enum Stmt<'a> {
     FnDecl {
         name: &'a str,
         params: Vec<Spanned<(&'a str, Type)>>,
-        ret_type: Spanned<Type>,
+        ret_type: Option<Spanned<Type>>,
         body: Vec<Spanned<Stmt<'a>>>,
     },
 }

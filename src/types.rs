@@ -5,11 +5,7 @@ pub enum Type {
     Bool,
     Fn {
         params: Vec<Self>,
-        ret_type: Box<Self>,
-    },
-    Procedure {
-        params: Vec<Self>,
-        ret: Option<Box<Self>>,
+        ret_type: Box<Option<Self>>,
     },
     None,
 }

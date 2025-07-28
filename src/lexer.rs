@@ -67,12 +67,12 @@ pub fn lexer<'src>(
         text::keyword("str").to(Token::Str),
         text::keyword("bool").to(Token::Bool),
         text::keyword("fn").to(Token::Fn),
+        text::keyword("none").to(Token::None),
     ));
 
     // Tokenize keywords
     let kword = choice((
         text::keyword("let").to(Token::Let),
-        text::keyword("proc").to(Token::Proc),
         text::keyword("ret").to(Token::Ret),
         text::keyword("if").to(Token::If),
         text::keyword("then").to(Token::Then),

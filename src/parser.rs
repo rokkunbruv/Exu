@@ -7,6 +7,11 @@ use crate::Span;
 use crate::Spanned;
 use chumsky::{input::ValueInput, pratt::*, prelude::*};
 
+// Note on skip_then_retry_until() since there is no documentation for it:
+// skip_then_retry_until(skip, until) is a recover strategy passed to recover_with(). This recovery strategy
+// skips over any input parsed by the 'skip' parser until it reaches an input parsed by the 'until' parser.
+// Both the 'skip' and 'until' parsers must return () [ this can be done using ignored() ]
+
 /// Exu parser
 /// Converts a list of tokens to an AST
 pub fn parser<'tokens, 'src: 'tokens, I>(
@@ -14,16 +19,16 @@ pub fn parser<'tokens, 'src: 'tokens, I>(
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
-    let procedure = proc_decl_parser();
+    let global_fn = global_fn_decl_parser();
 
-    procedure
+    global_fn
         .repeated()
         .collect::<Vec<_>>()
         .map_with(|p, _| Program::new(p))
 }
 
-/// Parser for procedures
-fn proc_decl_parser<'tokens, 'src: 'tokens, I>(
+/// Parser for global functions
+fn global_fn_decl_parser<'tokens, 'src: 'tokens, I>(
 ) -> impl Parser<'tokens, I, Spanned<ProgramItem<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>>
        + Clone
 where
@@ -41,14 +46,14 @@ where
         .delimited_by(just(Token::LeftBrace), just(Token::RightBrace))
         .map(|block| block);
 
-    just(Token::Proc)
+    just(Token::Fn)
         .ignore_then(name)
         .then(params)
         .then(return_type)
         .then(body)
         .map_with(|(((name, params), ret_type), body), e| {
             (
-                ProgramItem::Proc {
+                ProgramItem::Fn {
                     name,
                     body,
                     params,
@@ -57,10 +62,10 @@ where
                 e.span(),
             )
         })
-        // In case of errors, skip to the next procedure declaration
+        // In case of errors, skip to the next function declaration
         .recover_with(skip_then_retry_until(
             any().ignored(),
-            just(Token::Proc).ignored(),
+            just(Token::Fn).ignored(),
         ))
 }
 
@@ -136,8 +141,9 @@ where
             .then_ignore(just(Token::Colon))
             .then_ignore(just(Token::Fn))
             .then(params_parser())
-            .then(just(Token::RightArrow).ignore_then(type_parser()))
+            .then(just(Token::RightArrow).ignore_then(type_parser()).or_not())
             .then(block.clone())
+            .then_ignore(just(Token::Semicolon))
             .map_with(|(((name, params), ret_type), body), _| Stmt::FnDecl {
                 name,
                 params,
@@ -400,8 +406,11 @@ where
                     .collect::<Vec<_>>()
                     .delimited_by(just(Token::LeftParen), just(Token::RightParen)),
             )
-            .then_ignore(just(Token::RightArrow))
-            .then(t.clone())
+            .then(
+                just(Token::RightArrow)
+                    .ignore_then(just(Token::None).map(|_| None))
+                    .or(t.clone().map(|t| Some(t))),
+            )
             .map(|(params, ret_type)| Type::Fn {
                 params,
                 ret_type: Box::new(ret_type),

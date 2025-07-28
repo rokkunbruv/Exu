@@ -36,6 +36,7 @@ pub enum Token<'a> {
     Str,
     Bool,
     Fn,
+    None,
 
     // Keywords
     Let,
@@ -75,6 +76,7 @@ impl<'a> ToString for Token<'a> {
             Self::Str => String::from("str"),
             Self::Bool => String::from("bool"),
             Self::Fn => String::from("fn"),
+            Self::None => String::from("none"),
             Self::Let => String::from("let"),
             Self::Proc => String::from("proc"),
             Self::Ret => String::from("ret"),

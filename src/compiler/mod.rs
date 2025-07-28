@@ -81,7 +81,7 @@ pub struct Compiler<'prog> {
     vars: Vec<(&'prog str, Register)>,
     upvalues: Vec<(&'prog str, Register)>,
     scopes: Vec<Register>,
-    procedures: HashMap<&'prog str, Procedure<'prog>>,
+    globals: HashMap<&'prog str, Procedure<'prog>>,
     main: Option<Procedure<'prog>>,
 }
 
@@ -94,7 +94,7 @@ impl<'prog> Compiler<'prog> {
             vars: Vec::new(),
             upvalues: Vec::new(),
             scopes: Vec::new(),
-            procedures: HashMap::new(),
+            globals: HashMap::new(),
             main: None,
         }
     }
@@ -103,10 +103,10 @@ impl<'prog> Compiler<'prog> {
         &mut self,
         program: &'prog Program<'prog>,
     ) -> Result<Executable<'prog>, Box<dyn Error>> {
-        // Tallies all procedures to be defined
+        // Tallies all globals to be defined
         for item in &program.items {
             match &item.0 {
-                ProgramItem::Proc {
+                ProgramItem::Fn {
                     name,
                     params: _,
                     ret_type,
@@ -121,15 +121,15 @@ impl<'prog> Compiler<'prog> {
                         None => None,
                     };
 
-                    self.procedures.insert(name, Procedure::new(r_type))
+                    self.globals.insert(name, Procedure::new(r_type))
                 }
             };
         }
 
-        // Compile procedures
+        // Compile globals
         for item in &program.items {
             match &item.0 {
-                ProgramItem::Proc {
+                ProgramItem::Fn {
                     name,
                     params,
                     ret_type: _,
@@ -153,7 +153,7 @@ impl<'prog> Compiler<'prog> {
             )));
         }
 
-        for (name, procedure) in self.procedures.iter_mut() {
+        for (name, procedure) in self.globals.iter_mut() {
             labels.insert(*name, compiled_instrs.len());
             compiled_instrs.append(&mut procedure.instrs);
         }
@@ -233,7 +233,7 @@ impl<'prog> Compiler<'prog> {
         if *name == "main" {
             self.main = Some(new_procedure);
         } else {
-            self.procedures.insert(name, new_procedure);
+            self.globals.insert(name, new_procedure);
         }
 
         Ok(())
@@ -656,7 +656,7 @@ impl<'prog> Compiler<'prog> {
                     }
                 }
                 // Check if callee is a procedure
-                else if let Some((_, proc)) = self.procedures.get_key_value(name) {
+                else if let Some((_, proc)) = self.globals.get_key_value(name) {
                     match proc.ret_type {
                         Some(_) => return_exists = true,
                         None => return_exists = false,
@@ -819,7 +819,7 @@ impl<'prog> Compiler<'prog> {
     }
 
     fn define_var(&mut self, name: &'prog str, reg: Register) -> Result<(), Box<dyn Error>> {
-        if self.procedures.contains_key(name) {
+        if self.globals.contains_key(name) {
             return Err(Box::new(io::Error::new(
                 io::ErrorKind::Other,
                 "Identifier already being used by a procedure.",
