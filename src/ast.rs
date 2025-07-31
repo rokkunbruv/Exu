@@ -3,7 +3,7 @@ use crate::value::Value;
 use crate::Spanned;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ProgramItem<'a> {
+pub enum Global<'a> {
     Fn {
         name: &'a str,
         params: Vec<Spanned<(&'a str, Type)>>,

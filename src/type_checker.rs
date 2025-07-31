@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ProgramItem, Stmt};
+use crate::ast::{Expr, Global, Stmt};
 use crate::types::Type;
 use crate::value::Value;
 use crate::Program;
@@ -35,7 +35,7 @@ impl<'prog> TypeChecker<'prog> {
         // Brings all defined global structures to the global scope before performing type checking
         for (program_item, _) in program.items.iter() {
             match program_item {
-                ProgramItem::Fn {
+                Global::Fn {
                     name,
                     params,
                     ret_type,
@@ -59,7 +59,7 @@ impl<'prog> TypeChecker<'prog> {
         // Perform type checking on procedure definitions
         for (program_item, _) in program.items.iter() {
             match program_item {
-                ProgramItem::Fn {
+                Global::Fn {
                     name: _,
                     params,
                     ret_type,
@@ -86,18 +86,25 @@ impl<'prog> TypeChecker<'prog> {
         Ok(())
     }
 
+    /// Performs type checking on a block. Returns Ok if the block is type-consistent else returns an error.
     fn check_block_type(
         &mut self,
         block: &'prog Vec<Spanned<Stmt<'prog>>>,
-        expected_ret_type: Option<&Type>,
+        expected_ret_type: Option<&Type>, // Only applicable to function blocks and blocks inside functions; the expected type of the return expression
     ) -> Result<(), Box<dyn Error>> {
         self.begin_scope();
 
         let mut block_iter = block.iter().peekable();
 
+        // If true, a return statement exists in the block
+        let mut return_exists = match expected_ret_type {
+            Some(_) => false,
+            None => true,
+        }; 
+
         while let Some(stmt) = block_iter.next() {
             if let Stmt::Return { value } = &stmt.0 {
-                self.check_ret_stmt(value, expected_ret_type)?;
+                self.check_ret_stmt_type(value, expected_ret_type)?;
 
                 // Returns an error if the return statement is not the last statement in the block
                 if !block_iter.peek().is_none() {
@@ -107,10 +114,20 @@ impl<'prog> TypeChecker<'prog> {
                     )));
                 }
 
+                return_exists = true;
+
                 break;
             }
 
             self.check_stmt_type(stmt, expected_ret_type)?;
+        }
+
+        // Returns an error if the return statement cannot be found in a function that expects one
+        if !return_exists {
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::Other,
+                "The function with an expected return type doesn't return anything.",
+            )));
         }
 
         self.end_scope();
@@ -118,10 +135,11 @@ impl<'prog> TypeChecker<'prog> {
         Ok(())
     }
 
+    /// Performs type checking on a statement. Returns Ok if the statement is type-consistent else returns an error.
     fn check_stmt_type(
         &mut self,
         stmt: &'prog Spanned<Stmt<'prog>>,
-        expected_ret_type: Option<&Type>,
+        expected_ret_type: Option<&Type>, // Only applicable to blocks inside functions; the expected type of the return expression
     ) -> Result<(), Box<dyn Error>> {
         match &stmt.0 {
             Stmt::Expr { expr } => self.check_expr_type(expr)?,
@@ -133,7 +151,8 @@ impl<'prog> TypeChecker<'prog> {
                 else_block,
             } => {
                 let condition_type = self.get_expr_type(condition)?;
-                expect_type(vec![Type::Bool], &condition_type)?;
+                expect_type(vec![Type::Bool], &condition_type)?; // Ensures that the condition is of type Bool
+
                 self.check_block_type(then_block, expected_ret_type)?;
                 if let Some(e) = else_block {
                     self.check_block_type(e, expected_ret_type)?;
@@ -157,6 +176,8 @@ impl<'prog> TypeChecker<'prog> {
                 ret_type,
                 body,
             } => {
+                self.begin_scope();
+                
                 let mut params_type = Vec::new();
 
                 for ((param_name, param_type), _) in params {
@@ -176,6 +197,8 @@ impl<'prog> TypeChecker<'prog> {
                     ret_type: Box::new(ret_type.cloned()),
                 };
 
+                self.end_scope();
+
                 self.define_var_type(name, fn_type);
             }
             Stmt::Return { value: _ } => 
@@ -188,7 +211,7 @@ impl<'prog> TypeChecker<'prog> {
         Ok(())
     }
 
-    fn check_ret_stmt(
+    fn check_ret_stmt_type(
         &self,
         ret_val: &Option<Spanned<Expr<'prog>>>,
         expected_type: Option<&Type>,

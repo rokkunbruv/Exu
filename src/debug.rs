@@ -1,5 +1,5 @@
 use crate::cli::DebugArgs;
-use crate::compiler::Executable;
+use crate::executable::Executable;
 use crate::instruction::Instr;
 use crate::program::Program;
 use crate::token::Token;

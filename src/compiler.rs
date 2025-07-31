@@ -1,18 +1,17 @@
-mod object;
-
-use crate::ast::{Expr, ProgramItem, Stmt};
+use crate::ast::{Expr, Global, Stmt};
+use crate::executable::Executable;
 use crate::instruction::Instr;
+use crate::object::{Func, Object};
 use crate::types::Type;
 use crate::value::Value;
 use crate::vm::{Address, Register};
 use crate::Program;
 use crate::Spanned;
-use object::Object;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
 
-/// The register index to store the return value of a procedure/function/action call
+/// The register index to store the return value of a global_fn/function/action call
 const RETURN_REGISTER: Register = 0;
 // The starting register index to store values
 const START_REGISTER: Register = 1;
@@ -20,42 +19,11 @@ const START_REGISTER: Register = 1;
 // The starting address index to store objects
 const START_ADDRESS: Address = 0;
 
-#[derive(Debug)]
-pub struct Executable<'prog> {
-    pub labels: HashMap<&'prog str, Address>,
-    pub instructions: Vec<Instr<'prog>>,
-}
-
-impl<'prog> Executable<'prog> {
-    pub fn new(labels: HashMap<&'prog str, Address>, instructions: Vec<Instr<'prog>>) -> Self {
-        Self {
-            labels,
-            instructions,
-        }
-    }
-}
-
-struct Procedure<'prog> {
-    pub instrs: Vec<Instr<'prog>>,
-    pub ret_type: Option<Type>,
-}
-
-impl<'prog> Procedure<'prog> {
-    pub fn new(ret_type: Option<Type>) -> Self {
-        Self {
-            instrs: Vec::new(),
-            ret_type,
-        }
-    }
-
-    pub fn load_instrs(&mut self, instrs: Vec<Instr<'prog>>) {
-        self.instrs = instrs;
-    }
-}
-
 #[derive(Debug, Clone)]
 struct CompileContext {
+    /// When true, keeps track of any upvalues to the compiler's upvalues vector
     pub is_save_upvalues: bool,
+    /// When true, generates a new scope when entering a block
     pub is_generate_scope: bool,
 }
 
@@ -67,6 +35,8 @@ impl CompileContext {
         }
     }
 
+    /// Configures compiler context when compiling functions
+    /// In compiling functions, upvalues are to be tracked and scopes aren't generated around function body block
     pub fn fn_mode(mut self) -> Self {
         self.is_save_upvalues = true;
         self.is_generate_scope = false;
@@ -75,14 +45,22 @@ impl CompileContext {
 }
 
 pub struct Compiler<'prog> {
+    /// The current register index being tracked
     curr_reg: Register,
+    /// The current heap index being tracked
     curr_addr: Address,
-    objs: HashMap<&'prog str, Object<'prog>>,
+    /// Tracks all declared objects inside a global function
+    objs: Vec<Object<'prog>>,
+    /// Tracks all declared variables inside a global function
     vars: Vec<(&'prog str, Register)>,
+    /// Tracks all upvalues being accessed by a local function
     upvalues: Vec<(&'prog str, Register)>,
+    /// Stack of defined scopes
     scopes: Vec<Register>,
-    globals: HashMap<&'prog str, Procedure<'prog>>,
-    main: Option<Procedure<'prog>>,
+    /// Tracks all declared global objects
+    globals: HashMap<&'prog str, Object<'prog>>,
+    /// The main global function
+    main: Option<Func<'prog>>,
 }
 
 impl<'prog> Compiler<'prog> {
@@ -90,7 +68,7 @@ impl<'prog> Compiler<'prog> {
         Self {
             curr_reg: START_REGISTER,
             curr_addr: START_ADDRESS,
-            objs: HashMap::new(),
+            objs: Vec::new(),
             vars: Vec::new(),
             upvalues: Vec::new(),
             scopes: Vec::new(),
@@ -99,6 +77,7 @@ impl<'prog> Compiler<'prog> {
         }
     }
 
+    /// Converts an AST into a vector of bytecode instructions
     pub fn compile(
         &mut self,
         program: &'prog Program<'prog>,
@@ -106,12 +85,13 @@ impl<'prog> Compiler<'prog> {
         // Tallies all globals to be defined
         for item in &program.items {
             match &item.0 {
-                ProgramItem::Fn {
+                Global::Fn {
                     name,
                     params: _,
                     ret_type,
                     body: _,
                 } => {
+                    // Skip the main global function since it doesn't need to be tallied
                     if *name == "main" {
                         continue;
                     }
@@ -121,7 +101,9 @@ impl<'prog> Compiler<'prog> {
                         None => None,
                     };
 
-                    self.globals.insert(name, Procedure::new(r_type))
+                    self.globals
+                        .insert(name, Object::Function(Func::new(name, r_type, None)))
+                    // Don't pass the instructions yet since they will be added once they are generated
                 }
             };
         }
@@ -129,75 +111,92 @@ impl<'prog> Compiler<'prog> {
         // Compile globals
         for item in &program.items {
             match &item.0 {
-                ProgramItem::Fn {
+                Global::Fn {
                     name,
                     params,
-                    ret_type: _,
+                    ret_type,
                     body,
                 } => {
-                    self.compile_procedure(name, params, body)?;
+                    let r_type = &match ret_type {
+                        Some((type_, _)) => Some(type_.clone()),
+                        None => None,
+                    };
+
+                    self.compile_global_fn(name, params, r_type, body)?;
                 }
             };
         }
 
-        // Merge procedure instructions to executable
+        // Merge globals instructions to executable instructions
         let mut compiled_instrs = Vec::new();
         let mut labels: HashMap<&'prog str, Address> = HashMap::new();
 
+        // Append the main function first so that the VM will execute it first
         if let Some(main) = &mut self.main {
-            compiled_instrs.append(&mut main.instrs);
+            compiled_instrs.append(&mut main.instructions);
         } else {
             return Err(Box::new(io::Error::new(
                 io::ErrorKind::Other,
-                "Main procedure doesn't exists.",
+                "Main global function doesn't exists.",
             )));
         }
 
-        for (name, procedure) in self.globals.iter_mut() {
-            labels.insert(*name, compiled_instrs.len());
-            compiled_instrs.append(&mut procedure.instrs);
-        }
-
-        for (name, object) in self.objs.iter_mut() {
-            let mut obj_instrs;
-
-            match object {
-                Object::Function {
-                    address: _,
-                    capacity: _,
-                    upvalues: _,
-                    instructions,
-                } => {
-                    obj_instrs = instructions;
+        // Append the global objects after the main function
+        for (name, global) in self.globals.iter_mut() {
+            match global {
+                Object::Function(func) => {
+                    labels.insert(func.name, compiled_instrs.len());
+                    compiled_instrs.append(&mut func.instructions);
                 }
             }
-
-            labels.insert(*name, compiled_instrs.len());
-            compiled_instrs.append(&mut obj_instrs);
         }
+
+        // for object in self.objs.iter_mut() {
+        //     let mut obj_instrs;
+
+        //     match object {
+        //         Object::Function(func) => {
+        //             obj_instrs = func.instructions;
+        //             labels.insert(func.name, compiled_instrs.len());
+        //         }
+        //     }
+
+        //     compiled_instrs.append(&mut obj_instrs);
+        // }
 
         let executable = Executable::new(labels, compiled_instrs);
 
         Ok(executable)
     }
 
-    fn compile_procedure(
+    /// Compiles global functions
+    fn compile_global_fn(
         &mut self,
         name: &&'prog str,
         params: &Vec<Spanned<(&'prog str, Type)>>,
+        ret_type: &Option<Type>,
         body: &Vec<Spanned<Stmt<'prog>>>,
     ) -> Result<(), Box<dyn Error>> {
-        // Move curr register ptr at first register
+        // Clear the register file and scopes
         self.init_compiler();
 
         let context = CompileContext::new();
 
-        // Throws an error if a main procedure contains parameters
+        // Throw an error if the main function contains parameters or returns a value
         if *name == "main" && params.len() != 0 {
-            return Err(Box::new(io::Error::new(
-                io::ErrorKind::Other,
-                "Main procedure should not have parameters.",
-            )));
+            if params.len() != 0 {
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Main global function should not have parameters.",
+                )));
+            }
+
+            if let None = ret_type {
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Main global function should not return a value.",
+                )));
+            }
         }
 
         // Define parameters at first couple of registers
@@ -206,16 +205,16 @@ impl<'prog> Compiler<'prog> {
             self.curr_reg += 1;
         }
 
-        // Compile procedure body
+        // Compile global function body
         let body_instrs = self.compile_block(&context, body)?;
 
-        // Add lable to procedure instructions
+        // Add label to global function instructions
         let label_instr = vec![Instr::Label(name)];
 
         let return_instrs;
 
-        // If compiling a main procedure, end the procedure instruction block with an instruction to halt program execution
-        // Otherwise, end the procedure instruction block with an instruction to return to caller
+        // If compiling a main global function, end the global function instruction block with an instruction to halt program execution
+        // Otherwise, end the global function instruction block with an instruction to return to caller
         if *name == "main" {
             return_instrs = vec![Instr::HaltSuccess];
         } else {
@@ -226,19 +225,23 @@ impl<'prog> Compiler<'prog> {
         let compiled_instrs =
             self.compile_instrs_blocks(vec![label_instr, body_instrs, return_instrs]);
 
-        // Create new procedure struct
-        let mut new_procedure = Procedure::new(None);
-        new_procedure.load_instrs(compiled_instrs);
+        // Create new global function object
+        let new_global_fn = Func::new(name, ret_type.clone(), Some(compiled_instrs));
 
+        // Declare main function if found
         if *name == "main" {
-            self.main = Some(new_procedure);
-        } else {
-            self.globals.insert(name, new_procedure);
+            self.main = Some(new_global_fn);
+        }
+        // Else declare global function in global scope
+        else {
+            let global_fn_obj = Object::Function(new_global_fn);
+            self.globals.insert(name, global_fn_obj);
         }
 
         Ok(())
     }
 
+    /// Compiles statements
     fn compile_stmt(
         &mut self,
         context: &CompileContext,
@@ -247,20 +250,21 @@ impl<'prog> Compiler<'prog> {
         let mut compiled_instrs = match &ast.0 {
             Stmt::Expr { expr } => {
                 let instrs = self.compile_expr(context, expr)?;
-                self.curr_reg -= 1;
+                self.curr_reg -= 1; // Ignore the evaluated value of the expression since statements don't save values
                 instrs
             }
-            Stmt::Block(block_items) => self.compile_block(&CompileContext::new(), block_items)?,
+            Stmt::Block(block_items) => self.compile_block(&CompileContext::new(), block_items)?, // Create a new context around the block since contexts don't apply to nested blocks
             Stmt::Return { value } => {
                 let mut ret_instrs = Vec::new();
 
+                // Evaluate return expression
                 if let Some(ret_val) = value {
                     let mut instrs = self.compile_expr(context, ret_val)?;
                     ret_instrs.append(&mut instrs);
                 }
-
                 self.curr_reg -= 1;
 
+                // Save the return value and go back to the caller function
                 ret_instrs.append(&mut vec![
                     Instr::Mov {
                         dest: RETURN_REGISTER,
@@ -282,17 +286,20 @@ impl<'prog> Compiler<'prog> {
                 then_block,
                 else_block,
             } => {
+                // Evaluate condition
                 let condition_instrs = self.compile_expr(context, condition)?;
                 self.curr_reg -= 1;
 
                 let condition_reg = self.curr_reg;
 
-                let then_instrs = self.compile_block(context, then_block)?;
+                // Compile then and else blocks
+                let then_instrs = self.compile_block(&CompileContext::new(), then_block)?;
                 let mut else_instrs = Vec::new();
                 if let Some(e) = else_block {
-                    else_instrs = self.compile_block(context, e)?;
+                    else_instrs = self.compile_block(&CompileContext::new(), e)?;
                 }
 
+                // Generate instructions to skip then and else blocks
                 let skip_then_instr = vec![Instr::JmpOnFalse {
                     src: condition_reg,
                     offset: then_instrs.len() + 2,
@@ -314,11 +321,13 @@ impl<'prog> Compiler<'prog> {
                 var_type: _,
                 init,
             } => {
+                // Evaluate initializer
                 let init_instrs = match init {
                     Some(init_expr) => self.compile_expr(context, init_expr)?,
                     None => Vec::new(),
                 };
 
+                // Throw an error if the variable has already been defined
                 if let Some(_) = self.get_var(name) {
                     return Err(Box::new(io::Error::new(
                         io::ErrorKind::Other,
@@ -333,17 +342,22 @@ impl<'prog> Compiler<'prog> {
             Stmt::FnDecl {
                 name,
                 params,
-                ret_type: _,
+                ret_type,
                 body,
             } => {
                 // Declare a new scope over the function definition
                 self.begin_scope();
 
+                // Initialize upvalues
                 self.upvalues = Vec::new();
 
+                // Define the function within its scope (to allow calling itself within its body)
                 self.define_var(name, self.curr_reg)?;
                 self.curr_reg += 1;
 
+                // Saves the address where the function will be stored in the heap
+                // This is because the current address pointer will change as the function
+                // body encounters upvalues
                 let fn_addr = self.curr_addr;
 
                 // Define parameters at first couple of registers
@@ -378,14 +392,13 @@ impl<'prog> Compiler<'prog> {
                 let compiled_instrs =
                     self.compile_instrs_blocks(vec![store_upvalues_instrs, define_fn_val_instrs]);
 
-                let fn_obj = Object::Function {
-                    address: fn_addr,
-                    capacity: self.upvalues.len(),
-                    upvalues: self.upvalues.clone(),
-                    instructions: fn_instrs,
+                let r_type = match ret_type {
+                    Some((type_, _)) => Some(type_.clone()),
+                    None => None,
                 };
 
-                self.objs.insert(name, fn_obj);
+                let fn_obj = Object::Function(Func::new(name, r_type, Some(fn_instrs)));
+                self.objs.push(fn_obj);
 
                 compiled_instrs
             }
@@ -397,6 +410,7 @@ impl<'prog> Compiler<'prog> {
         Ok(base_instrs)
     }
 
+    /// Compiles blocks
     fn compile_block(
         &mut self,
         context: &CompileContext,
@@ -421,6 +435,7 @@ impl<'prog> Compiler<'prog> {
         Ok(compiled_instrs)
     }
 
+    /// Compiles expressions
     fn compile_expr(
         &mut self,
         context: &CompileContext,
@@ -428,6 +443,7 @@ impl<'prog> Compiler<'prog> {
     ) -> Result<Vec<Instr<'prog>>, Box<dyn Error>> {
         match &expr.0 {
             Expr::Val(v) => {
+                // Loads the value to the current register and move to the next empty register
                 self.curr_reg += 1;
 
                 Ok(vec![Instr::LoadI {
@@ -436,11 +452,12 @@ impl<'prog> Compiler<'prog> {
                 }])
             }
             Expr::Ident(var) => {
+                // Check if the variable is defined in scope
                 if let Some((var_name, src)) = self.get_var(var) {
                     let res;
 
+                    // If the variable is an upvalue, load them from the heap
                     if context.is_save_upvalues && self.is_nonlocal(var_name) {
-                        println!("{}", var_name);
                         self.add_upvalue(var_name, *src);
                         res = vec![Instr::Load {
                             dest: self.curr_reg,
@@ -448,7 +465,9 @@ impl<'prog> Compiler<'prog> {
                         }];
 
                         self.curr_addr += 1;
-                    } else {
+                    }
+                    // Else access them to where they are stored in the register file
+                    else {
                         res = vec![Instr::Mov {
                             dest: self.curr_reg,
                             src: *src,
@@ -629,37 +648,40 @@ impl<'prog> Compiler<'prog> {
                 Ok(instrs)
             }
             Expr::Call { name, args } => {
+                // This track whether the callee returns a value or not (true if it returns a value)
                 let return_exists;
 
                 // Check if callee is a function
-                if let Some(_) = self.get_var(name) {
-                    if let Some(obj) = self.get_obj(name) {
-                        if let Object::Function {
-                            address: _,
-                            capacity: _,
-                            upvalues: _,
-                            instructions: _,
-                        } = obj
-                        {
-                            return_exists = true;
-                        } else {
-                            return Err(Box::new(io::Error::new(
-                                io::ErrorKind::Other,
-                                "Fatal error: Attempting to call a non-function",
-                            )));
-                        }
-                    } else {
-                        return Err(Box::new(io::Error::new(
-                            io::ErrorKind::Other,
-                            "Fatal error: Attempting to call a non-function",
-                        )));
-                    }
-                }
-                // Check if callee is a procedure
-                else if let Some((_, proc)) = self.globals.get_key_value(name) {
-                    match proc.ret_type {
-                        Some(_) => return_exists = true,
-                        None => return_exists = false,
+                // if let Some(_) = self.get_var(name) {
+                //     if let Some(obj) = self.get_obj(name) {
+                //         if let Object::Function {
+                //             address: _,
+                //             capacity: _,
+                //             upvalues: _,
+                //             instructions: _,
+                //         } = obj
+                //         {
+                //             return_exists = true;
+                //         } else {
+                //             return Err(Box::new(io::Error::new(
+                //                 io::ErrorKind::Other,
+                //                 "Fatal error: Attempting to call a non-function",
+                //             )));
+                //         }
+                //     } else {
+                //         return Err(Box::new(io::Error::new(
+                //             io::ErrorKind::Other,
+                //             "Fatal error: Attempting to call a non-function",
+                //         )));
+                //     }
+                // }
+                if let Some(global) = self.get_global(name) {
+                    match global {
+                        // Check if the callee is a global function
+                        Object::Function(global_fn) => match global_fn.ret_type {
+                            Some(_) => return_exists = true,
+                            None => return_exists = false,
+                        },
                     }
                 } else {
                     return Err(Box::new(io::Error::new(
@@ -670,10 +692,8 @@ impl<'prog> Compiler<'prog> {
 
                 let mut arg_instrs = Vec::new();
 
-                // Saves the last register being pointed by curr register ptr
-                // Before entering call
+                // Saves the last register being pointed by current register pointer before entering the call
                 let arg_reg_start = self.curr_reg;
-                println!("{}", arg_reg_start);
 
                 // Evaluate call arguments
                 for arg in args {
@@ -730,6 +750,9 @@ impl<'prog> Compiler<'prog> {
         }
     }
 
+    /// Helper function to combine multiple vectors of instructions into a single instructions vector.
+    /// Accepts a vector of instructions vectors, returns an instructions vector.
+    // TODO: Convert this to a macro
     fn compile_instrs_blocks(&self, instrs_blocks: Vec<Vec<Instr<'prog>>>) -> Vec<Instr<'prog>> {
         return instrs_blocks
             .into_iter()
@@ -737,6 +760,8 @@ impl<'prog> Compiler<'prog> {
             .collect::<Vec<_>>();
     }
 
+    /// Generates instructions for saving upvalues to the heap.
+    /// Accepts the address to store the first upvalue, returns instructions to store the upvalues.
     fn save_upvalues(&self, start_addr: &Address) -> Vec<Instr<'prog>> {
         let mut save_upvals_instrs = Vec::new();
 
@@ -753,30 +778,40 @@ impl<'prog> Compiler<'prog> {
         return save_upvals_instrs;
     }
 
+    /// Saves a variable to the upvalues vector
     fn add_upvalue(&mut self, name: &'prog str, reg: Register) {
         self.upvalues.push((name, reg));
     }
 
-    // Returns true if a variable is initialized in an outer scope, else returns false.
+    /// Accepts a variable name, returns true if a variable is initialized in an outer scope else returns false.
     fn is_nonlocal(&self, name: &'prog str) -> bool {
+        // Obtain the starting index of the localmost scope
         let inner_scope = self
             .scopes
             .last()
             .expect("Fatal error: Cannot peek from an empty scopes stack.");
 
         for (var_name, reg_pos) in self.vars.iter().rev() {
-            if &name == var_name && inner_scope > reg_pos {
-                return true;
+            if &name == var_name {
+                // Return true if the variable is defined before the localmost scope is set
+                if inner_scope > reg_pos {
+                    return true;
+                } else {
+                    break;
+                }
             }
         }
 
         false
     }
 
+    /// Creates a new scope by pushing the current register pointer to the scopes stack.
+    /// This register pointer will point to the first variable defined in this new scope.
     fn begin_scope(&mut self) {
         self.scopes.push(self.curr_reg);
     }
 
+    /// Exits the current scope by popping the register pointer of the current scope off the scopes stack.
     fn end_scope(&mut self) {
         self.curr_reg = self
             .scopes
@@ -784,6 +819,8 @@ impl<'prog> Compiler<'prog> {
             .expect("Fatal error: Cannot pop from an empty scopes stack");
     }
 
+    /// Generates instructions to store the local variables to the stack.
+    /// Accepts the number of local variables to be saved
     fn save_local_values(&self, count: &usize) -> Vec<Instr<'prog>> {
         let mut save_locals_instrs = Vec::new();
 
@@ -804,10 +841,17 @@ impl<'prog> Compiler<'prog> {
         return load_locals_instrs;
     }
 
-    fn get_obj(&self, name: &'prog str) -> Option<&Object<'prog>> {
-        self.objs.get(name)
+    /// Gets the global object from the globals hashmap
+    fn get_global(&self, name: &'prog str) -> Option<&Object<'prog>> {
+        self.globals.get(name)
     }
 
+    /// Gets the object
+    // fn get_obj(&self, name: &'prog str) -> Option<&Object<'prog>> {
+    //     self.objs.get(name)
+    // }
+
+    /// Gets the variable from the variables stack
     fn get_var(&self, name: &'prog str) -> Option<&(&'prog str, Register)> {
         for value in self.vars.iter().rev() {
             if value.0 == name {
@@ -818,11 +862,12 @@ impl<'prog> Compiler<'prog> {
         None
     }
 
+    /// Adds a new variable to the variable stack
     fn define_var(&mut self, name: &'prog str, reg: Register) -> Result<(), Box<dyn Error>> {
         if self.globals.contains_key(name) {
             return Err(Box::new(io::Error::new(
                 io::ErrorKind::Other,
-                "Identifier already being used by a procedure.",
+                "Identifier already being used by a global function.",
             )));
         }
 
@@ -831,6 +876,7 @@ impl<'prog> Compiler<'prog> {
         Ok(())
     }
 
+    /// Clears the register pointer and the local variables stack
     fn init_compiler(&mut self) {
         self.curr_reg = START_REGISTER;
         self.vars = Vec::new();

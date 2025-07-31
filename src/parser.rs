@@ -1,4 +1,4 @@
-use crate::ast::{Expr, ProgramItem, Stmt};
+use crate::ast::{Expr, Global, Stmt};
 use crate::token::Token;
 use crate::types::Type;
 use crate::value::Value;
@@ -29,8 +29,7 @@ where
 
 /// Parser for global functions
 fn global_fn_decl_parser<'tokens, 'src: 'tokens, I>(
-) -> impl Parser<'tokens, I, Spanned<ProgramItem<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>>
-       + Clone
+) -> impl Parser<'tokens, I, Spanned<Global<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
@@ -53,7 +52,7 @@ where
         .then(body)
         .map_with(|(((name, params), ret_type), body), e| {
             (
-                ProgramItem::Fn {
+                Global::Fn {
                     name,
                     body,
                     params,

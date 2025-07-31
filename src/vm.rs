@@ -1,5 +1,5 @@
-use crate::compiler::Executable;
 use crate::debug::DebugConfig;
+use crate::executable::Executable;
 use crate::instruction::Instr;
 use crate::value::Value;
 use std::fmt;
