@@ -6,6 +6,7 @@ use std::fmt;
 
 pub type Register = usize;
 pub type Address = usize;
+pub type Label<'prog> = &'prog str;
 
 pub type RegisterType = [Slot; 24];
 
@@ -158,6 +159,16 @@ impl VM {
                     } else {
                         panic!("ERROR");
                     }
+                }
+                Instr::JmpAddr { src } => {
+                    let addr;
+
+                    match self.registers[src] {
+                        Slot::Addr(a) => addr = a,
+                        _ => panic!("ERROR"),
+                    }
+
+                    pc = instrs.iter().enumerate().skip(addr);
                 }
                 Instr::Label(_) => {
                     continue;

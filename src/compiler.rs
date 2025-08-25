@@ -1,3 +1,5 @@
+use chumsky::label;
+
 use crate::ast::{Expr, Global, Stmt};
 use crate::executable::Executable;
 use crate::instruction::Instr;
@@ -16,51 +18,98 @@ const RETURN_REGISTER: Register = 0;
 // The starting register index to store values
 const START_REGISTER: Register = 1;
 
+// The register where the function object will be stored during a function call
+const FN_OBJ_REGISTER: Register = 1;
+
 // The starting address index to store objects
 const START_ADDRESS: Address = 0;
 
+// A placeholder address that will be changed later
+const PLACEHOLDER_ADDRESS: Address = 0;
+
+/// Context object to keep track of compilation flags
+/// These compilation flags allow the compiler to behave differently
+/// when compiling certain objects or statements
 #[derive(Debug, Clone)]
 struct CompileContext {
     /// When true, keeps track of any upvalues to the compiler's upvalues vector
-    pub is_save_upvalues: bool,
+    pub enable_save_upvalues: bool,
     /// When true, generates a new scope when entering a block
-    pub is_generate_scope: bool,
+    pub enable_generate_scope: bool,
 }
 
 impl CompileContext {
     pub fn new() -> Self {
         Self {
-            is_save_upvalues: false,
-            is_generate_scope: true,
+            enable_save_upvalues: false,
+            enable_generate_scope: true,
         }
     }
 
-    /// Configures compiler context when compiling functions
+    /// Configures compiler context when compiling local functions
     /// In compiling functions, upvalues are to be tracked and scopes aren't generated around function body block
-    pub fn fn_mode(mut self) -> Self {
-        self.is_save_upvalues = true;
-        self.is_generate_scope = false;
+    pub fn local_fn_mode(mut self) -> Self {
+        self.enable_save_upvalues = true;
+        self.enable_generate_scope = false;
         self
+    }
+}
+
+/// Stores information to resolve labels with their addresses in the instruction list
+/// To store the addresses of the labels to the heap
+struct LabelFixup {
+    /// The label to be resolved
+    pub label: String,
+    /// The register where the label address will be stored to
+    pub load_reg: Register,
+    /// The offset position of the load label address instruction with the placeholder address
+    /// in which it will be replaced when the label address is resolved
+    pub load_label_addr_instr_offset: usize,
+}
+
+impl LabelFixup {
+    pub fn new(label: String, load_reg: Register, load_label_addr_instr_offset: usize) -> Self {
+        Self {
+            label,
+            load_reg,
+            load_label_addr_instr_offset,
+        }
+    }
+
+    /// Helper function to update the offset position of the load instruction
+    /// To be used in blocks
+    pub fn adjust_load_instr_offset(&mut self, additional_offset: usize) {
+        self.load_label_addr_instr_offset += additional_offset;
     }
 }
 
 pub struct Compiler<'prog> {
     /// The current register index being tracked
     curr_reg: Register,
+
     /// The current heap index being tracked
     curr_addr: Address,
-    /// Tracks all declared objects inside a global function
-    objs: Vec<Object<'prog>>,
+
+    /// Tracks all declared local objects inside a global function
+    local_objs: Vec<Object<'prog>>,
+
     /// Tracks all declared variables inside a global function
     vars: Vec<(&'prog str, Register)>,
+
     /// Tracks all upvalues being accessed by a local function
     upvalues: Vec<(&'prog str, Register)>,
+
     /// Stack of defined scopes
     scopes: Vec<Register>,
+
     /// Tracks all declared global objects
     globals: HashMap<&'prog str, Object<'prog>>,
+
     /// The main global function
     main: Option<Func<'prog>>,
+
+    /// Tracks all function labels to be resolved
+    fn_label_fixups: HashMap<&'prog str, LabelFixup>,
 }
 
 impl<'prog> Compiler<'prog> {
@@ -68,12 +117,13 @@ impl<'prog> Compiler<'prog> {
         Self {
             curr_reg: START_REGISTER,
             curr_addr: START_ADDRESS,
-            objs: Vec::new(),
+            local_objs: Vec::new(),
             vars: Vec::new(),
             upvalues: Vec::new(),
             scopes: Vec::new(),
             globals: HashMap::new(),
             main: None,
+            fn_label_fixups: HashMap::new(),
         }
     }
 
@@ -101,8 +151,18 @@ impl<'prog> Compiler<'prog> {
                         None => None,
                     };
 
-                    self.globals
-                        .insert(name, Object::Function(Func::new(name, r_type, None)))
+                    self.globals.insert(
+                        name,
+                        Object::Function(Func::new(
+                            name,
+                            name.to_string(),
+                            r_type,
+                            None,
+                            self.curr_addr,
+                        )),
+                    );
+
+                    self.curr_addr += 1;
                     // Don't pass the instructions yet since they will be added once they are generated
                 }
             };
@@ -117,19 +177,14 @@ impl<'prog> Compiler<'prog> {
                     ret_type,
                     body,
                 } => {
-                    let r_type = &match ret_type {
-                        Some((type_, _)) => Some(type_.clone()),
-                        None => None,
-                    };
-
-                    self.compile_global_fn(name, params, r_type, body)?;
+                    self.compile_global_fn(name, params, ret_type, body)?;
                 }
             };
         }
 
         // Merge globals instructions to executable instructions
         let mut compiled_instrs = Vec::new();
-        let mut labels: HashMap<&'prog str, Address> = HashMap::new();
+        let mut globals_labels: HashMap<String, Address> = HashMap::new();
 
         // Append the main function first so that the VM will execute it first
         if let Some(main) = &mut self.main {
@@ -142,29 +197,52 @@ impl<'prog> Compiler<'prog> {
         }
 
         // Append the global objects after the main function
-        for (name, global) in self.globals.iter_mut() {
+        for (_, global) in self.globals.iter_mut() {
             match global {
                 Object::Function(func) => {
-                    labels.insert(func.name, compiled_instrs.len());
+                    globals_labels.insert(func.name.to_string(), compiled_instrs.len());
                     compiled_instrs.append(&mut func.instructions);
                 }
             }
         }
 
-        // for object in self.objs.iter_mut() {
-        //     let mut obj_instrs;
+        let mut fn_obj_labels: HashMap<String, Address> = HashMap::new();
 
-        //     match object {
-        //         Object::Function(func) => {
-        //             obj_instrs = func.instructions;
-        //             labels.insert(func.name, compiled_instrs.len());
-        //         }
-        //     }
+        for object in self.local_objs.iter_mut() {
+            let mut obj_instrs;
 
-        //     compiled_instrs.append(&mut obj_instrs);
-        // }
+            match object {
+                Object::Function(func) => {
+                    obj_instrs = func.instructions.clone();
+                    fn_obj_labels.insert(func.label.clone(), compiled_instrs.len());
+                }
+            }
 
-        let executable = Executable::new(labels, compiled_instrs);
+            compiled_instrs.append(&mut obj_instrs);
+        }
+
+        // Resolve the labels of the function objects
+        for (_, label_fixup) in self.fn_label_fixups.iter() {
+            let address;
+            match fn_obj_labels.get(&label_fixup.label) {
+                Some(addr) => address = addr,
+                None => {
+                    return Err(Box::new(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Fatal error: Cannot resolve address of function object label.",
+                    )))
+                }
+            };
+
+            // Adding 1 to the instruction offset takes into account the label instruction
+            // of the global function
+            compiled_instrs[label_fixup.load_label_addr_instr_offset] = Instr::LoadAddr {
+                dest: label_fixup.load_reg,
+                addr: *address,
+            };
+        }
+
+        let executable = Executable::new(globals_labels, compiled_instrs);
 
         Ok(executable)
     }
@@ -174,7 +252,7 @@ impl<'prog> Compiler<'prog> {
         &mut self,
         name: &&'prog str,
         params: &Vec<Spanned<(&'prog str, Type)>>,
-        ret_type: &Option<Type>,
+        ret_type: &Option<Spanned<Type>>,
         body: &Vec<Spanned<Stmt<'prog>>>,
     ) -> Result<(), Box<dyn Error>> {
         // Clear the register file and scopes
@@ -199,6 +277,10 @@ impl<'prog> Compiler<'prog> {
             }
         }
 
+        let label = name.to_string();
+
+        let global_fn_addr = self.curr_addr;
+
         // Define parameters at first couple of registers
         for ((param, _), _) in params {
             self.define_var(param, self.curr_reg.clone())?;
@@ -209,7 +291,7 @@ impl<'prog> Compiler<'prog> {
         let body_instrs = self.compile_block(&context, body)?;
 
         // Add label to global function instructions
-        let label_instr = vec![Instr::Label(name)];
+        let label_instr = vec![Instr::Label(label)];
 
         let return_instrs;
 
@@ -221,12 +303,45 @@ impl<'prog> Compiler<'prog> {
             return_instrs = vec![Instr::JmpToCaller];
         }
 
+        // let define_fn_val_instrs = vec![
+        //     Instr::LoadAddr {
+        //         dest: self.curr_reg,
+        //         addr: PLACEHOLDER_ADDRESS,
+        //     },
+        //     Instr::Store {
+        //         src: self.curr_reg,
+        //         addr: global_fn_addr,
+        //     },
+        // ];
+
+        // if name != "main" {
+        //     let label_fixup = LabelFixup::new(
+        //     label.clone(),
+        //     self.curr_reg,
+        //     store_upvalues_instrs.len() + 1,
+        // );
+        // self.fn_label_fixups.insert(name, label_fixup);
+        // }
+
         // Compile instructions
         let compiled_instrs =
             self.compile_instrs_blocks(vec![label_instr, body_instrs, return_instrs]);
 
+        let r_type = match ret_type {
+            Some((type_, _)) => Some(type_.clone()),
+            None => None,
+        };
+
         // Create new global function object
-        let new_global_fn = Func::new(name, ret_type.clone(), Some(compiled_instrs));
+        let new_global_fn = Func::new(
+            name,
+            name.to_string(),
+            r_type,
+            Some(compiled_instrs),
+            self.curr_addr,
+        );
+
+        self.curr_addr += 1;
 
         // Declare main function if found
         if *name == "main" {
@@ -344,64 +459,7 @@ impl<'prog> Compiler<'prog> {
                 params,
                 ret_type,
                 body,
-            } => {
-                // Declare a new scope over the function definition
-                self.begin_scope();
-
-                // Initialize upvalues
-                self.upvalues = Vec::new();
-
-                // Define the function within its scope (to allow calling itself within its body)
-                self.define_var(name, self.curr_reg)?;
-                self.curr_reg += 1;
-
-                // Saves the address where the function will be stored in the heap
-                // This is because the current address pointer will change as the function
-                // body encounters upvalues
-                let fn_addr = self.curr_addr;
-
-                // Define parameters at first couple of registers
-                for ((param, _), _) in params {
-                    self.define_var(param, self.curr_reg.clone())?;
-                    self.curr_reg += 1;
-                }
-
-                // Compile function body
-                let body_instrs = self.compile_block(&context.clone().fn_mode(), body)?;
-
-                // Add label to function instructions
-                let label_instr = vec![Instr::Label(name)];
-
-                let return_instr = vec![Instr::JmpToCaller];
-
-                // Generate instructions to store the function's upvalues
-                let store_upvalues_instrs = self.save_upvalues(&fn_addr);
-
-                self.end_scope();
-
-                let define_fn_val_instrs = vec![Instr::LoadAddr {
-                    dest: self.curr_reg,
-                    addr: fn_addr,
-                }];
-                self.curr_reg += 1;
-
-                // Compile instructions
-                let fn_instrs =
-                    self.compile_instrs_blocks(vec![label_instr, body_instrs, return_instr]);
-
-                let compiled_instrs =
-                    self.compile_instrs_blocks(vec![store_upvalues_instrs, define_fn_val_instrs]);
-
-                let r_type = match ret_type {
-                    Some((type_, _)) => Some(type_.clone()),
-                    None => None,
-                };
-
-                let fn_obj = Object::Function(Func::new(name, r_type, Some(fn_instrs)));
-                self.objs.push(fn_obj);
-
-                compiled_instrs
-            }
+            } => self.compile_function(context, name, params, ret_type, body)?,
         };
 
         let mut base_instrs = Vec::new();
@@ -418,17 +476,38 @@ impl<'prog> Compiler<'prog> {
     ) -> Result<Vec<Instr<'prog>>, Box<dyn Error>> {
         let mut compiled_instrs = Vec::new();
 
-        if context.is_generate_scope {
+        if context.enable_generate_scope {
             self.begin_scope();
         }
 
         for stmt in block {
             let mut instrs = self.compile_stmt(context, stmt)?;
 
+            // Update the instruction offset of the label fixup after compiling a function declaration
+            if let Stmt::FnDecl {
+                name,
+                params: _,
+                ret_type: _,
+                body: _,
+            } = stmt.0
+            {
+                match self.fn_label_fixups.get_mut(name) {
+                    Some(label_fixup) => {
+                        label_fixup.adjust_load_instr_offset(compiled_instrs.len())
+                    }
+                    None => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            "Fatal error: Attempting to access an undefined label fixup.",
+                        )))
+                    }
+                }
+            }
+
             compiled_instrs.append(&mut instrs);
         }
 
-        if context.is_generate_scope {
+        if context.enable_generate_scope {
             self.end_scope();
         }
 
@@ -457,7 +536,7 @@ impl<'prog> Compiler<'prog> {
                     let res;
 
                     // If the variable is an upvalue, load them from the heap
-                    if context.is_save_upvalues && self.is_nonlocal(var_name) {
+                    if context.enable_save_upvalues && self.is_nonlocal(var_name) {
                         self.add_upvalue(var_name, *src);
                         res = vec![Instr::Load {
                             dest: self.curr_reg,
@@ -651,37 +730,29 @@ impl<'prog> Compiler<'prog> {
                 // This track whether the callee returns a value or not (true if it returns a value)
                 let return_exists;
 
+                let load_fn_obj_instr;
+
                 // Check if callee is a function
-                // if let Some(_) = self.get_var(name) {
-                //     if let Some(obj) = self.get_obj(name) {
-                //         if let Object::Function {
-                //             address: _,
-                //             capacity: _,
-                //             upvalues: _,
-                //             instructions: _,
-                //         } = obj
-                //         {
-                //             return_exists = true;
-                //         } else {
-                //             return Err(Box::new(io::Error::new(
-                //                 io::ErrorKind::Other,
-                //                 "Fatal error: Attempting to call a non-function",
-                //             )));
-                //         }
-                //     } else {
-                //         return Err(Box::new(io::Error::new(
-                //             io::ErrorKind::Other,
-                //             "Fatal error: Attempting to call a non-function",
-                //         )));
-                //     }
-                // }
-                if let Some(global) = self.get_global(name) {
+                if let Some((_, reg)) = self.get_var(name) {
+                    return_exists = true;
+
+                    load_fn_obj_instr = vec![Instr::Mov {
+                        dest: FN_OBJ_REGISTER,
+                        src: *reg,
+                    }]
+                } else if let Some(global) = self.get_global(name) {
                     match global {
                         // Check if the callee is a global function
-                        Object::Function(global_fn) => match global_fn.ret_type {
-                            Some(_) => return_exists = true,
-                            None => return_exists = false,
-                        },
+                        Object::Function(global_fn) => {
+                            match global_fn.ret_type {
+                                Some(_) => return_exists = true,
+                                None => return_exists = false,
+                            };
+                            load_fn_obj_instr = vec![Instr::LoadAddr {
+                                dest: FN_OBJ_REGISTER,
+                                addr: global_fn.address,
+                            }]
+                        }
                     }
                 } else {
                     return Err(Box::new(io::Error::new(
@@ -710,15 +781,19 @@ impl<'prog> Compiler<'prog> {
 
                 for i in 0..args.len() {
                     move_arg_instrs.push(Instr::Mov {
-                        dest: i + 1,
+                        dest: FN_OBJ_REGISTER + i + 1,
                         src: arg_reg_start + i,
                     });
                 }
 
+                self.use_curr_reg();
+
                 // Jump to callee; also saves program counter at after jump instruction
                 let jump_instrs = vec![
                     Instr::PushStackPC { offset: 2 },
-                    Instr::JmpLabel { label: name },
+                    Instr::JmpAddr {
+                        src: FN_OBJ_REGISTER,
+                    },
                 ];
 
                 // Load locals after call
@@ -730,16 +805,15 @@ impl<'prog> Compiler<'prog> {
                 let mut get_ret_val_instrs = Vec::new();
                 if return_exists {
                     get_ret_val_instrs = vec![Instr::Mov {
-                        dest: self.curr_reg,
+                        dest: self.use_curr_reg(),
                         src: RETURN_REGISTER,
                     }];
                 }
 
-                self.curr_reg += 1;
-
                 Ok(self.compile_instrs_blocks(vec![
                     arg_instrs,
                     save_instrs,
+                    load_fn_obj_instr,
                     move_arg_instrs,
                     jump_instrs,
                     load_instrs,
@@ -748,6 +822,104 @@ impl<'prog> Compiler<'prog> {
             }
             Expr::Error => panic!("Fatal error: Attempting to compile an error expression"),
         }
+    }
+
+    fn compile_function(
+        &mut self,
+        context: &CompileContext,
+        name: &'prog str,
+        params: &Vec<Spanned<(&'prog str, Type)>>,
+        ret_type: &Option<Spanned<Type>>,
+        body: &Vec<Spanned<Stmt<'prog>>>,
+    ) -> Result<Vec<Instr<'prog>>, Box<dyn Error>> {
+        // Declare a new scope over the function definition
+        self.begin_scope();
+
+        // Initialize upvalues
+        self.upvalues = Vec::new();
+
+        // Set label of the function body
+        // This will be used to create the label instruction and the label fixup
+        let label = format!("{}_fn_obj", name);
+
+        // Define the function within its scope (to allow calling itself within its body)
+        self.define_var(name, self.curr_reg)?;
+        self.use_curr_reg();
+
+        // Saves the address where the function will be stored in the heap
+        // This is because the current address pointer will change as the function
+        // body encounters upvalues
+        let fn_addr = self.use_curr_addr();
+
+        // Define parameters at first couple of registers
+        for ((param, _), _) in params {
+            let curr_reg = self.use_curr_reg();
+            self.define_var(param, curr_reg)?;
+        }
+
+        // Compile function body
+        let body_instrs = self.compile_block(&context.clone().local_fn_mode(), body)?;
+
+        // Add label to function instructions
+        let label_instr = vec![Instr::Label(label.clone())];
+
+        let return_instr = match ret_type {
+            Some(_) => Vec::new(),
+            None => vec![Instr::JmpToCaller],
+        };
+
+        // Generate instructions to store the function's upvalues
+        let store_upvalues_instrs = self.save_upvalues(&fn_addr);
+
+        self.end_scope();
+
+        let define_fn_val_instrs = vec![
+            Instr::LoadAddr {
+                dest: self.curr_reg,
+                addr: PLACEHOLDER_ADDRESS,
+            },
+            Instr::Store {
+                src: self.curr_reg,
+                addr: fn_addr,
+            },
+        ];
+
+        // Create the label fixup object to be used for label address resolution
+        let label_fixup = LabelFixup::new(
+            label.clone(),
+            self.use_curr_reg(),
+            store_upvalues_instrs.len() + 1,
+        );
+        self.fn_label_fixups.insert(name, label_fixup);
+
+        // Compile instructions
+
+        // These are the instructions for the function's body
+        let fn_instrs = self.compile_instrs_blocks(vec![label_instr, body_instrs, return_instr]);
+
+        // These are instructions to initialize the function object and store them to the heap
+        let compiled_instrs;
+
+        // When compiling the main function, it is not necessary to initialize the function object
+        // as it will be automatically executed during runtime
+        compiled_instrs =
+            self.compile_instrs_blocks(vec![store_upvalues_instrs, define_fn_val_instrs]);
+
+        let r_type = match ret_type {
+            Some((type_, _)) => Some(type_.clone()),
+            None => None,
+        };
+
+        let func = Func::new(name, label, r_type, Some(fn_instrs), fn_addr);
+        let fn_obj = Object::Function(func);
+
+        // Add the function to the objects vector
+        self.local_objs.push(fn_obj.clone());
+
+        // Define the local function variable
+        self.define_var(name, self.curr_reg - 1)?;
+
+        Ok(compiled_instrs)
     }
 
     /// Helper function to combine multiple vectors of instructions into a single instructions vector.
@@ -817,6 +989,8 @@ impl<'prog> Compiler<'prog> {
             .scopes
             .pop()
             .expect("Fatal error: Cannot pop from an empty scopes stack");
+
+        self.vars.truncate(self.curr_reg); // Truncate vars stack to get rid of local variables from the previous scope
     }
 
     /// Generates instructions to store the local variables to the stack.
@@ -824,7 +998,7 @@ impl<'prog> Compiler<'prog> {
     fn save_local_values(&self, count: &usize) -> Vec<Instr<'prog>> {
         let mut save_locals_instrs = Vec::new();
 
-        for reg in START_REGISTER..*count {
+        for reg in (START_REGISTER..*count).rev() {
             save_locals_instrs.push(Instr::PushStack { src: reg });
         }
 
@@ -848,7 +1022,9 @@ impl<'prog> Compiler<'prog> {
 
     /// Gets the object
     // fn get_obj(&self, name: &'prog str) -> Option<&Object<'prog>> {
-    //     self.objs.get(name)
+    //     for obj in self.local_objs.iter() {
+    //         if obj.
+    //     }
     // }
 
     /// Gets the variable from the variables stack
@@ -874,6 +1050,20 @@ impl<'prog> Compiler<'prog> {
         self.vars.push((name, reg));
 
         Ok(())
+    }
+
+    /// Helper function to store the value to the current address being pointed
+    /// in the heap and move to the next register
+    fn use_curr_addr(&mut self) -> Address {
+        self.curr_addr += 1;
+        self.curr_addr - 1
+    }
+
+    /// Helper function to store the value to the current register being pointed
+    /// and move to the next register
+    fn use_curr_reg(&mut self) -> Register {
+        self.curr_reg += 1;
+        self.curr_reg - 1
     }
 
     /// Clears the register pointer and the local variables stack
