@@ -2,12 +2,12 @@ use crate::instruction::Instr;
 use crate::types::Type;
 use crate::vm::Address;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Object<'a> {
     Function(Func<'a>),
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Func<'a> {
     pub name: &'a str,
     pub label: String,

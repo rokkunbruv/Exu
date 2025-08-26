@@ -102,6 +102,9 @@ pub struct Compiler<'prog> {
     /// Stack of defined scopes
     scopes: Vec<Register>,
 
+    /// Stack of function calls
+    call_stack: Vec<Register>,
+
     /// Tracks all declared global objects
     globals: HashMap<&'prog str, Object<'prog>>,
 
@@ -121,6 +124,7 @@ impl<'prog> Compiler<'prog> {
             vars: Vec::new(),
             upvalues: Vec::new(),
             scopes: Vec::new(),
+            call_stack: Vec::new(),
             globals: HashMap::new(),
             main: None,
             fn_label_fixups: HashMap::new(),
@@ -459,7 +463,7 @@ impl<'prog> Compiler<'prog> {
                 params,
                 ret_type,
                 body,
-            } => self.compile_function(context, name, params, ret_type, body)?,
+            } => todo!(),
         };
 
         let mut base_instrs = Vec::new();
@@ -832,8 +836,19 @@ impl<'prog> Compiler<'prog> {
         ret_type: &Option<Spanned<Type>>,
         body: &Vec<Spanned<Stmt<'prog>>>,
     ) -> Result<Vec<Instr<'prog>>, Box<dyn Error>> {
+        for scope in &self.scopes {
+            print!("{} ", scope);
+        }
+        println!();
+        println!();
+        for (name, reg) in &self.vars {
+            print!("{}-{}", name, reg);
+        }
+        println!();
+        println!();
+
         // Declare a new scope over the function definition
-        self.begin_scope();
+        self.begin_call();
 
         // Initialize upvalues
         self.upvalues = Vec::new();
@@ -871,7 +886,13 @@ impl<'prog> Compiler<'prog> {
         // Generate instructions to store the function's upvalues
         let store_upvalues_instrs = self.save_upvalues(&fn_addr);
 
-        self.end_scope();
+        self.end_call();
+
+        for scope in &self.scopes {
+            print!("{} ", scope);
+        }
+        println!();
+        println!();
 
         let define_fn_val_instrs = vec![
             Instr::LoadAddr {
@@ -975,6 +996,23 @@ impl<'prog> Compiler<'prog> {
         }
 
         false
+    }
+
+    fn begin_call(&mut self) {
+        self.begin_scope();
+        self.call_stack.push(self.scopes.len());
+        self.curr_reg = START_REGISTER;
+    }
+
+    fn end_call(&mut self) {
+        let scope_from_outer_fn = self
+            .call_stack
+            .pop()
+            .expect("Fatal error: Cannot pop from an empty call stack");
+
+        self.scopes.truncate(scope_from_outer_fn);
+
+        self.end_scope();
     }
 
     /// Creates a new scope by pushing the current register pointer to the scopes stack.
