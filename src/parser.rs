@@ -90,6 +90,15 @@ where
                 expr: Box::new(expr),
             });
 
+        let assign_stmt = ident_parser()
+            .then_ignore(just(Token::Colon))
+            .then(expr_parser())
+            .then_ignore(just(Token::Semicolon))
+            .map_with(|(var, expr), _| Stmt::Assign {
+                ident: var,
+                value: Box::new(expr),
+            });
+
         let ret_stmt = just(Token::Ret)
             .ignore_then(expr_parser().or_not())
             .then_ignore(just(Token::Semicolon))
@@ -125,6 +134,7 @@ where
         let block_stmt = block.clone().map(|block| Stmt::Block(block));
 
         let stmt = expr_stmt
+            .or(assign_stmt)
             .or(ret_stmt)
             .or(println_stmt)
             .or(if_stmt)

@@ -372,6 +372,28 @@ impl<'prog> Compiler<'prog> {
                 self.curr_reg -= 1; // Ignore the evaluated value of the expression since statements don't save values
                 instrs
             }
+            Stmt::Assign { ident, value } => {
+                let var_reg = match self.get_var(ident) {
+                    None => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            "Variable is not defined",
+                        )))
+                    }
+                    Some((_, reg)) => *reg,
+                };
+
+                let expr_instrs = self.compile_expr(context, value)?;
+
+                self.curr_reg -= 1;
+
+                let assign_instrs = vec![Instr::Mov {
+                    dest: var_reg,
+                    src: self.curr_reg,
+                }];
+
+                self.compile_instrs_blocks(vec![expr_instrs, assign_instrs])
+            }
             Stmt::Block(block_items) => self.compile_block(&CompileContext::new(), block_items)?, // Create a new context around the block since contexts don't apply to nested blocks
             Stmt::Return { value } => {
                 let mut ret_instrs = Vec::new();

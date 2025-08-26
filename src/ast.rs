@@ -18,6 +18,10 @@ pub enum Stmt<'a> {
     Expr {
         expr: Box<Spanned<Expr<'a>>>,
     },
+    Assign {
+        ident: &'a str,
+        value: Box<Spanned<Expr<'a>>>,
+    },
     Return {
         value: Option<Spanned<Expr<'a>>>,
     },

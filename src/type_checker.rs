@@ -143,6 +143,12 @@ impl<'prog> TypeChecker<'prog> {
     ) -> Result<(), Box<dyn Error>> {
         match &stmt.0 {
             Stmt::Expr { expr } => self.check_expr_type(expr)?,
+            Stmt::Assign { ident, value } => {
+                let var_type = self.get_var_type(ident)?;
+                let val_type = self.get_expr_type(value)?;
+
+                match_types(&var_type, &val_type)?;
+            }
             Stmt::Block(block) => self.check_block_type(block, expected_ret_type)?,
             Stmt::Println { content } => self.check_expr_type(content)?,
             Stmt::If {
