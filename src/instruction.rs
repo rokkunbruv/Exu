@@ -78,6 +78,20 @@ pub enum Instr<'a> {
         src1: Register,
         src2: Register,
     },
+    And {
+        dest: Register,
+        src1: Register,
+        src2: Register,
+    },
+    Or {
+        dest: Register,
+        src1: Register,
+        src2: Register,
+    },
+    Not {
+        dest: Register,
+        src: Register,
+    },
     /// Pushes the value stored in src register to the stack.
     PushStack {
         src: Register,

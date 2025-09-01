@@ -352,6 +352,22 @@ impl<'prog> TypeChecker<'prog> {
                 expect_matched_types(vec![Type::Num, Type::Str, Type::Bool], &type1, &type2)?;
                 Ok(Type::Bool)
             }
+            Expr::And(expr1, expr2) => {
+                let type1 = self.get_expr_type(&expr1)?;
+                let type2 = self.get_expr_type(&expr2)?;
+                expect_matched_types(vec![Type::Bool], &type1, &type2)?;
+                Ok(Type::Bool)
+            }
+            Expr::Or(expr1, expr2) => {
+                let type1 = self.get_expr_type(&expr1)?;
+                let type2 = self.get_expr_type(&expr2)?;
+                expect_matched_types(vec![Type::Bool], &type1, &type2)?;
+                Ok(Type::Bool)
+            }
+            Expr::Not(expr1) => {
+                let type1 = self.get_expr_type(&expr1)?;
+                expect_type(vec![Type::Bool], &type1)
+            }
             Expr::Error => panic!("Fatal error: Attempting to typecheck an error expression")
         }
     }

@@ -258,13 +258,18 @@ where
 
         let expr = primary.pratt((
             // Parsing negation
-            prefix(6, op(Token::Minus), |_, rhs: Spanned<Expr<'src>>, _| {
+            prefix(7, op(Token::Minus), |_, rhs: Spanned<Expr<'src>>, _| {
                 let span = rhs.1;
                 (Expr::Neg(Box::new(rhs)), span.into())
             }),
+            // Parsing not
+            prefix(7, op(Token::Bang), |_, rhs: Spanned<Expr<'src>>, _| {
+                let span = rhs.1;
+                (Expr::Not(Box::new(rhs)), span.into())
+            }),
             // Parsing multiplication
             infix(
-                left(5),
+                left(6),
                 op(Token::Star),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -273,7 +278,7 @@ where
             ),
             // Parsing division
             infix(
-                left(5),
+                left(6),
                 op(Token::Slash),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -282,7 +287,7 @@ where
             ),
             // Parsing addition
             infix(
-                left(4),
+                left(5),
                 op(Token::Plus),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -291,7 +296,7 @@ where
             ),
             // Parsing subtraction
             infix(
-                left(4),
+                left(5),
                 op(Token::Minus),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -300,7 +305,7 @@ where
             ),
             // Parsing greater than
             infix(
-                left(3),
+                left(4),
                 op(Token::Greater),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -309,7 +314,7 @@ where
             ),
             // Parsing greater than or equal
             infix(
-                left(3),
+                left(4),
                 op(Token::GreaterEqual),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -318,7 +323,7 @@ where
             ),
             // Parsing less than
             infix(
-                left(3),
+                left(4),
                 op(Token::Less),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -327,7 +332,7 @@ where
             ),
             // Parsing less than or equal
             infix(
-                left(3),
+                left(4),
                 op(Token::LessEqual),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -336,7 +341,7 @@ where
             ),
             // Parsing equal
             infix(
-                left(2),
+                left(3),
                 op(Token::Equal),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
@@ -345,11 +350,29 @@ where
             ),
             // Parsing not equal
             infix(
-                left(2),
+                left(3),
                 op(Token::NotEqual),
                 |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
                     let span = lhs.1.start..rhs.1.end;
                     (Expr::NotEq(Box::new(lhs), Box::new(rhs)), span.into())
+                },
+            ),
+            // Parsing and
+            infix(
+                left(2),
+                op(Token::And),
+                |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
+                    let span = lhs.1.start..rhs.1.end;
+                    (Expr::And(Box::new(lhs), Box::new(rhs)), span.into())
+                },
+            ),
+            // Parsing or
+            infix(
+                left(1),
+                op(Token::Or),
+                |lhs: Spanned<Expr<'src>>, _, rhs: Spanned<Expr<'src>>, _| {
+                    let span = lhs.1.start..rhs.1.end;
+                    (Expr::Or(Box::new(lhs), Box::new(rhs)), span.into())
                 },
             ),
         ));

@@ -125,6 +125,18 @@ impl VM {
                     let is_not_eq = self.registers[src1] != self.registers[src2];
                     self.load_to_reg(dest, Slot::Val(Value::Bool(is_not_eq)));
                 }
+                Instr::And { dest, src1, src2 } => {
+                    let is_and = self.get_bool(src1) && self.get_bool(src2);
+                    self.load_to_reg(dest, Slot::Val(Value::Bool(is_and)));
+                }
+                Instr::Or { dest, src1, src2 } => {
+                    let is_or = self.get_bool(src1) || self.get_bool(src2);
+                    self.load_to_reg(dest, Slot::Val(Value::Bool(is_or)));
+                }
+                Instr::Not { dest, src } => {
+                    let is_not = !self.get_bool(src);
+                    self.load_to_reg(dest, Slot::Val(Value::Bool(is_not)));
+                }
                 Instr::PushStack { src } => {
                     self.stack.push(self.registers[src].clone());
                 }

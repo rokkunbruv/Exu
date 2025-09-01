@@ -46,6 +46,9 @@ pub fn lexer<'src>(
         just('!').then(just('=')).to(Token::NotEqual),
         just('=').to(Token::Equal),
         just(':').to(Token::Colon),
+        just('&').to(Token::And),
+        just('!').to(Token::Bang),
+        just('|').to(Token::Or),
         just(';').to(Token::Semicolon),
         just(',').to(Token::Comma),
     ));

@@ -17,6 +17,9 @@ pub enum Token<'a> {
     Equal,
     NotEqual,
     Colon,
+    And,
+    Or,
+    Bang,
     // Period,
 
     // Syntactic Tokens
@@ -40,7 +43,6 @@ pub enum Token<'a> {
 
     // Keywords
     Let,
-    Proc,
     Ret,
     Println, // TEMPORARY
     If,
@@ -64,6 +66,9 @@ impl<'a> ToString for Token<'a> {
             Self::Equal => String::from("="),
             Self::NotEqual => String::from("!="),
             Self::Colon => String::from(":"),
+            Self::And => String::from("&"),
+            Self::Or => String::from("|"),
+            Self::Bang => String::from("!"),
             Self::Semicolon => String::from(";"),
             Self::Comma => String::from(","),
             Self::RightArrow => String::from("->"),
@@ -78,7 +83,6 @@ impl<'a> ToString for Token<'a> {
             Self::Fn => String::from("fn"),
             Self::None => String::from("none"),
             Self::Let => String::from("let"),
-            Self::Proc => String::from("proc"),
             Self::Ret => String::from("ret"),
             Self::Println => String::from("println"),
             Self::If => String::from("if"),

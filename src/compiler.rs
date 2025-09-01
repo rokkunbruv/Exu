@@ -547,15 +547,10 @@ impl<'prog> Compiler<'prog> {
         expr: &Spanned<Expr<'prog>>,
     ) -> Result<Vec<Instr<'prog>>, Box<dyn Error>> {
         match &expr.0 {
-            Expr::Val(v) => {
-                // Loads the value to the current register and move to the next empty register
-                self.curr_reg += 1;
-
-                Ok(vec![Instr::LoadI {
-                    dest: self.curr_reg - 1,
-                    val: v.clone(),
-                }])
-            }
+            Expr::Val(v) => Ok(vec![Instr::LoadI {
+                dest: self.use_curr_reg(),
+                val: v.clone(),
+            }]),
             Expr::Ident(var) => {
                 // Check if the variable is defined in scope
                 if let Some((var_name, src)) = self.get_var(var) {
@@ -748,6 +743,44 @@ impl<'prog> Compiler<'prog> {
                     dest: self.curr_reg - 1,
                     src1: self.curr_reg - 1,
                     src2: self.curr_reg,
+                }]);
+
+                Ok(instrs)
+            }
+            Expr::And(expr1, expr2) => {
+                let mut instrs = self.compile_expr(context, &expr1)?;
+                instrs.append(&mut self.compile_expr(context, &expr2)?);
+
+                self.curr_reg -= 1;
+
+                instrs.append(&mut vec![Instr::And {
+                    dest: self.curr_reg - 1,
+                    src1: self.curr_reg - 1,
+                    src2: self.curr_reg,
+                }]);
+
+                Ok(instrs)
+            }
+            Expr::Or(expr1, expr2) => {
+                let mut instrs = self.compile_expr(context, &expr1)?;
+                instrs.append(&mut self.compile_expr(context, &expr2)?);
+
+                self.curr_reg -= 1;
+
+                instrs.append(&mut vec![Instr::Or {
+                    dest: self.curr_reg - 1,
+                    src1: self.curr_reg - 1,
+                    src2: self.curr_reg,
+                }]);
+
+                Ok(instrs)
+            }
+            Expr::Not(expr) => {
+                let mut instrs = self.compile_expr(context, &expr)?;
+
+                instrs.append(&mut vec![Instr::Not {
+                    dest: self.curr_reg - 1,
+                    src: self.curr_reg - 1,
                 }]);
 
                 Ok(instrs)
