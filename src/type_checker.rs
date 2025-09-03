@@ -348,17 +348,11 @@ impl<'prog> TypeChecker<'prog> {
                 expect_matched_types(vec![Type::Num], &type1, &type2)?;
                 Ok(Type::Bool)
             }
-            Expr::Eq(expr1, expr2) => {
-                let type1 = self.get_expr_type(&expr1)?;
-                let type2 = self.get_expr_type(&expr2)?;
-                expect_matched_types(vec![Type::Num, Type::Str, Type::Bool], &type1, &type2)?;
-                Ok(Type::Bool)
+            Expr::Eq(_, _) => {
+                Ok(Type::Bool) // Exu allows equality check between different typed values
             }
-            Expr::NotEq(expr1, expr2) => {
-                let type1 = self.get_expr_type(&expr1)?;
-                let type2 = self.get_expr_type(&expr2)?;
-                expect_matched_types(vec![Type::Num, Type::Str, Type::Bool], &type1, &type2)?;
-                Ok(Type::Bool)
+            Expr::NotEq(_, _) => {
+                Ok(Type::Bool) // Exu allows equality check between different typed values
             }
             Expr::And(expr1, expr2) => {
                 let type1 = self.get_expr_type(&expr1)?;
