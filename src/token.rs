@@ -48,6 +48,8 @@ pub enum Token<'a> {
     If,
     Then,
     Else,
+    While,
+    Do,
 }
 
 impl<'a> ToString for Token<'a> {
@@ -88,6 +90,8 @@ impl<'a> ToString for Token<'a> {
             Self::If => String::from("if"),
             Self::Then => String::from("then"),
             Self::Else => String::from("else"),
+            Self::While => String::from("while"),
+            Self::Do => String::from("do"),
         }
     }
 }

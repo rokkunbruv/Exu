@@ -33,6 +33,10 @@ pub enum Stmt<'a> {
         then_block: Vec<Spanned<Self>>,
         else_block: Option<Vec<Spanned<Self>>>,
     },
+    While {
+        condition: Box<Spanned<Expr<'a>>>,
+        body: Vec<Spanned<Self>>,
+    },
     Block(Vec<Spanned<Self>>),
 
     // Declarations

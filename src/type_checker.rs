@@ -164,6 +164,14 @@ impl<'prog> TypeChecker<'prog> {
                     self.check_block_type(e, expected_ret_type)?;
                 }
             }
+            Stmt::While {
+                condition, body
+            } => {
+                let condition_type = self.get_expr_type(condition)?;
+                expect_type(vec![Type::Bool], &condition_type)?; // Ensures that the condition is of type Bool
+
+                self.check_block_type(body, expected_ret_type)?;
+            }
             Stmt::VarDecl {
                 name,
                 var_type: (var_type, _),

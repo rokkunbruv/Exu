@@ -146,7 +146,13 @@ impl VM {
                         self.stack.pop().expect("Cannot pop from an empty stack.");
                 }
                 Instr::Jmp { offset } => {
-                    pc = instrs.iter().enumerate().skip(pc_loc + offset);
+                    let usize_offset = offset.abs() as usize;
+
+                    if offset >= 0 {
+                        pc = instrs.iter().enumerate().skip(pc_loc + usize_offset);
+                    } else {
+                        pc = instrs.iter().enumerate().skip(pc_loc - usize_offset);
+                    }
                 }
                 Instr::JmpOnFalse { src, offset } => {
                     let boolean = self.get_bool(src);

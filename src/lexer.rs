@@ -81,6 +81,8 @@ pub fn lexer<'src>(
         text::keyword("then").to(Token::Then),
         text::keyword("else").to(Token::Else),
         text::keyword("println").to(Token::Println),
+        text::keyword("while").to(Token::While),
+        text::keyword("do").to(Token::Do),
     ));
 
     // Tokenize identifiers

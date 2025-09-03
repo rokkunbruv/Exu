@@ -131,6 +131,16 @@ where
                 else_block,
             });
 
+        let while_stmt = just(Token::While)
+            .ignore_then(
+                expr_parser()
+                    .map(|expr| Box::new(expr))
+                    .delimited_by(just(Token::LeftParen), just(Token::RightParen)),
+            )
+            .then_ignore(just(Token::Do))
+            .then(block.clone().map(|block| block))
+            .map_with(|(condition, body), _| Stmt::While { condition, body });
+
         let block_stmt = block.clone().map(|block| Stmt::Block(block));
 
         let stmt = expr_stmt
@@ -138,6 +148,7 @@ where
             .or(ret_stmt)
             .or(println_stmt)
             .or(if_stmt)
+            .or(while_stmt)
             .or(block_stmt);
 
         // DECLARATION COMBINATORS

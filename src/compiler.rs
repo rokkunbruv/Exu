@@ -446,7 +446,7 @@ impl<'prog> Compiler<'prog> {
                     offset: then_instrs.len() + 2,
                 }];
                 let skip_else_instr = vec![Instr::Jmp {
-                    offset: else_instrs.len() + 1,
+                    offset: (else_instrs.len() + 1) as i16,
                 }];
 
                 self.compile_instrs_blocks(vec![
@@ -455,6 +455,31 @@ impl<'prog> Compiler<'prog> {
                     then_instrs,
                     skip_else_instr,
                     else_instrs,
+                ])
+            }
+            Stmt::While { condition, body } => {
+                // Evaluate condition
+                let condition_instrs = self.compile_expr(context, condition)?;
+                self.curr_reg -= 1;
+
+                let condition_reg = self.curr_reg;
+
+                let body_instrs = self.compile_block(context, body)?;
+
+                let skip_body_instr = vec![Instr::JmpOnFalse {
+                    src: condition_reg,
+                    offset: body_instrs.len() + 2,
+                }];
+
+                let loop_instr = vec![Instr::Jmp {
+                    offset: -((condition_instrs.len() + body_instrs.len() + 1) as i16), // 1 includes the skip body instruction
+                }];
+
+                self.compile_instrs_blocks(vec![
+                    condition_instrs,
+                    skip_body_instr,
+                    body_instrs,
+                    loop_instr,
                 ])
             }
             Stmt::VarDecl {

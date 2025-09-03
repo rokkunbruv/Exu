@@ -107,7 +107,7 @@ pub enum Instr<'a> {
     /// A positive offset jumps downward of the instructions list.
     /// A negative offset jumps upward of the instructions list.
     Jmp {
-        offset: usize,
+        offset: i16,
     },
     /// Jumps to location in instructions relative to offset if the value in src register evaluates to false.
     /// A positive offset jumps downward of the instructions list.
